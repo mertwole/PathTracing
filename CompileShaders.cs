@@ -1,7 +1,8 @@
 ﻿using OpenTK.Graphics.OpenGL;
+using System;
 using System.IO;
 
-namespace Lighting_Test
+namespace Path_Tracing
 {
     class CompileShaders
     {
@@ -20,7 +21,7 @@ namespace Lighting_Test
 
             GL.ShaderSource(vert_shader, vertex_shader_code);
             GL.CompileShader(vert_shader);
-          
+
             shader_program = GL.CreateProgram();
 
             GL.AttachShader(shader_program, vert_shader);

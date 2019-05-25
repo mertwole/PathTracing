@@ -1,5 +1,5 @@
-#version 430 core
-layout( local_size_x = 32, local_size_y = 32) in;
+#version 440 core
+layout( local_size_x = 16, local_size_y = 16) in;
 
 layout (binding = 0, rgba8) uniform image2D Texture;
 
@@ -47,13 +47,6 @@ struct Sphere
 	int material_id;
 };
 
-struct Triangle
-{
-	vec3[3] vertices;
-
-	int material_id;
-};
-
 struct Plane
 {
 	vec3 normal;
@@ -62,31 +55,33 @@ struct Plane
 	int material_id;
 };
 
+struct Triangle
+{
+	vec3 vertices[3];
+
+	int material_id;
+};
+
 Raytrace_result TraceWithSphere(Ray ray, Sphere sphere);
 Raytrace_result TraceWithPlane(Ray ray, Plane plane);
 Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle);
 
-#define REFLECTIONS 10
+#define REFLECTIONS 7
 
 //************primitives**************************************
 
-#define SPHERES_COUNT 4
-#define PLANES_COUNT 6
-#define TRIANGLES_COUNT 0
+uniform int triangles_amount;
+uniform int spheres_amount;
+uniform int planes_amount;
 
-#if SPHERES_COUNT != 0
-Sphere[SPHERES_COUNT] spheres = 
+
+Sphere[] spheres = 
 {
-	{vec3(1, 0, -2), 0.5, 3},
-	{vec3(-1, 0, -2), 0.5, 3},
-	{vec3(1, -1, -2), 0.5, 3},
-	{vec3(-1, -1, -2), 0.5, 3},
+	{vec3(0, 0, 0), 1, 6},
 };
-#endif
 
-#if PLANES_COUNT != 0
-Plane[PLANES_COUNT] planes = 
-{//normal point material_id
+Plane planes[] = 
+{
 	{normalize(vec3(0, 1, 0)), vec3(0, -3, 0), 3},//bottom
 	{normalize(vec3(0, -1, 0)), vec3(0, 3, 0), 6},//top
 
@@ -96,17 +91,105 @@ Plane[PLANES_COUNT] planes =
 	{normalize(vec3(0, 0, 1)), vec3(0, 0, -3), 3},//far
 	{normalize(vec3(0, 0, -1)), vec3(0, 0, 3), 3}//near
 };
-#endif
 
-#if TRIANGLES_COUNT != 0
-Triangle[TRIANGLES_COUNT] triangles = 
-{//vertices[3] material_id
-	{{vec3(-1, -1, 1),			vec3(0, -1, 1 - sqrt(3)),	vec3(1, -1, 1)}, 4},
-	{{vec3(-1, -1, 1),			vec3(1, -1, 1),				vec3(0, 1, 1 - 1 / sqrt(3))}, 4},
-	{{vec3(-1, -1, 1),			vec3(0, 1, 1 - 1 / sqrt(3)),vec3(0, -1, 1 - sqrt(3))}, 4},
-	{{vec3(0, 1, 1 - 1 / sqrt(3)),vec3(1, -1, 1),			vec3(0, -1, 1 - sqrt(3))}, 4}
+
+
+//******************triangles*******************
+layout(std430, binding = 0) buffer tr_vertices//3 vertices per triangle
+{
+	vec4 triangle_vertices[];
 };
-#endif
+
+layout(std430, binding = 1) buffer tr_materials
+{
+	int triangle_materials[];
+};
+
+struct AABB
+{
+	vec3 _min;
+	vec3 _max;
+};
+
+struct kDtree_node
+{
+	int left;
+	int right;
+	int parent;
+
+	int index;
+};
+
+struct kDtree_leaf
+{
+	int parent;
+
+	int index;
+
+	int triangle_insdexes_pos;
+	int triangle_insdexes_length;
+};
+
+uniform int node_count;
+
+layout(std430, binding = 2) buffer _nodes
+{
+	kDtree_node[] nodes;
+};
+
+layout(std430, binding = 3) buffer _leaves
+{
+	kDtree_leaf[] leaves;
+};
+
+layout(std430, binding = 4) buffer _triangle_indexes_kDtree
+{
+	int[] triangle_indexes_kDtree;
+};
+
+layout(std430, binding = 5) buffer _aabbs
+{
+	vec4[] aabbs;//by index
+};
+
+AABB getAABBbyIndex(int index)
+{
+	return AABB(aabbs[index * 2].xyz, aabbs[index * 2 + 1].xyz);
+}
+
+//********************spheres*******************
+layout(std430, binding = 6) buffer sp_centers
+{
+	vec4 sphere_centers[];
+};
+
+layout(std430, binding = 7) buffer sp_radiuses
+{
+	float sphere_radiuses[];
+};
+
+layout(std430, binding = 8) buffer sp_materials
+{
+	int sphere_materials[];
+};
+//*******************planes***********************
+layout(std430, binding = 9) buffer pl_points
+{
+	vec4 plane_points[];
+};
+
+layout(std430, binding = 10) buffer pl_normals
+{
+	vec4 plane_normals[];
+};
+
+layout(std430, binding = 11) buffer pl_materials
+{
+	int plane_materials[];
+};
+//************************************************
+
+
 //******************materials*********************************
 
 struct Material
@@ -124,11 +207,11 @@ Material[] materials =
 {//  color          emission		emissive reflective refractive refraction
 	{vec3(1, 0, 0), vec3(1, 1, 1),	0.0,		0.0,	0.0,		1.00},//0
 	{vec3(0, 1, 0), vec3(1, 1, 1),	0.0,		0.0,	0.0,		1.00},//1
-	{vec3(0.5),     vec3(0, 0, 0),	0.0,		0.5,	0.0,		1.00},//2
+	{vec3(0, 0, 1), vec3(0, 0, 0),	0.0,		0.5,	0.0,		1.00},//2
 	{vec3(0.5),     vec3(0, 0, 0),	0.0,		0.0,	0.0,		1.00},//3
 	{vec3(0.5),		vec3(0, 0, 0),	0.0,		0.0,	1.0,		1.20},//4
-	{vec3(0, 0, 1), vec3(0, 0, 0),	0.0,		0.0,	0.0,		1.00},//5
-	{vec3(0, 0, 1), vec3(2, 2, 2),	1.0,		0.0,	0.0,		1.00},//6
+	{vec3(1, 1, 1), vec3(0, 0, 0),	0.0,		0.0,	0.0,		1.00},//5
+	{vec3(0, 0, 0), vec3(2, 2, 2),	1.0,		0.0,	0.0,		1.00},//6
 };
 //************************camera******************************
 vec3 view_point = vec3(0, 0, 10);
@@ -220,8 +303,8 @@ Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle)
 {
 	Raytrace_result result;
 
-	vec3 normal = normalize(cross(triangle.vertices[0] - triangle.vertices[1], triangle.vertices[0] - triangle.vertices[2]));
-	Plane triangle_plane = {normal, triangle.vertices[0], 0};
+	vec3 normal = normalize(cross(triangle.vertices[0].xyz - triangle.vertices[1].xyz, triangle.vertices[0].xyz - triangle.vertices[2].xyz));
+	Plane triangle_plane = {normal, triangle.vertices[0].xyz, 0};
 	result = TraceWithPlane(ray, triangle_plane);
 
 	if(!result.intersection)
@@ -235,11 +318,11 @@ Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle)
 		int k = int(mod(i + 2, 3));//third vertex
 
 		//determine plane P that is parallel to triangle normal & contains JK
-		vec3 P_normal = cross(triangle.vertices[j] - triangle.vertices[k], triangle_plane.normal);
+		vec3 P_normal = cross(triangle.vertices[j].xyz - triangle.vertices[k].xyz, triangle_plane.normal);
 		//plane equality is P_normal.x * X + P_normal.y * Y + P_normal.z * Z + d = 0 (normal can be unnormalized)
-		float d = -dot(P_normal, triangle.vertices[j]);
+		float d = -dot(P_normal, triangle.vertices[j].xyz);
 
-		float I_side = sign(dot(P_normal, triangle.vertices[i]) + d);
+		float I_side = sign(dot(P_normal, triangle.vertices[i].xyz) + d);
 		float Contact_side = sign(dot(P_normal, result.contact) + d);
 
 		if(Contact_side == 0)
@@ -254,56 +337,277 @@ Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle)
 
 	return result;
 }
-//************************************************************
 
-Raytrace_result TraceRay(Ray ray)
+Raytrace_result TraceWithBox(Ray ray, AABB box)
 {
-	float min_t = INFINITY;
-
 	Raytrace_result result;
 	result.intersection = false;
 
-	#if SPHERES_COUNT != 0
-	for(int i = 0; i < SPHERES_COUNT; i++)//find sphere with min t
+	float tmin, tmax, tymin, tymax, tzmin, tzmax;
+	
+	if(EqualsZero(ray.direction.x))
 	{
-		Raytrace_result res = TraceWithSphere(ray, spheres[i]);
+		tmin = -INFINITY;
+		tmax = INFINITY;
+	}
+	else if (ray.direction.x > 0) 
+	{
+		tmin = (box._min.x - ray.source.x) / ray.direction.x;
+		tmax = (box._max.x - ray.source.x) / ray.direction.x;
+	}	
+	else
+	{
+		tmin = (box._max.x - ray.source.x) / ray.direction.x;
+		tmax = (box._min.x - ray.source.x) / ray.direction.x;
+	}
 
-		if(res.intersection && res.t < min_t)
+	if(EqualsZero(ray.direction.y))
+	{
+		tymin = -INFINITY;
+		tymax = INFINITY;
+	}
+	else if (ray.direction.y > 0) {
+		tymin = (box._min.y - ray.source.y) / ray.direction.y;
+		tymax = (box._max.y - ray.source.y) / ray.direction.y;
+	}
+	else {
+		tymin = (box._max.y - ray.source.y) / ray.direction.y;
+		tymax = (box._min.y - ray.source.y) / ray.direction.y;
+	}
+
+	if ( (tmin > tymax) || (tymin > tmax) )
+		return result;
+	if (tymin > tmin)
+		tmin = tymin;
+	if (tymax < tmax)
+		tmax = tymax;
+
+	if(EqualsZero(ray.direction.z))
+	{
+		tzmin = -INFINITY;
+		tzmax = INFINITY;
+	}
+	else if (ray.direction.z > 0) 
+	{
+		tzmin = (box._min.z - ray.source.z) / ray.direction.z;
+		tzmax = (box._max.z - ray.source.z) / ray.direction.z;
+	}
+	else 
+	{
+		tzmin = (box._max.z - ray.source.z) / ray.direction.z;
+		tzmax = (box._min.z - ray.source.z) / ray.direction.z;
+	}
+	if ( (tmin > tzmax) || (tzmin > tmax) )
+		return result;
+	if (tzmin > tmin)
+		tmin = tzmin;
+	if (tzmax < tmax)
+		tmax = tzmax;
+
+	if(tmin < ray.max_value && tmin > ray.min_value)
+	{
+		result.t = tmin;
+		result.intersection = true;
+		result.contact = ray.source + ray.direction * tmin;
+	}
+	else if(tmax < ray.max_value && tmax > ray.min_value)
+	{
+		result.t = tmax;
+		result.intersection = true;
+		result.contact = ray.source + ray.direction * tmax;
+	}
+
+	return result;
+}
+
+
+//************************************************************
+bool[1024] KdTreeAllChecked;
+
+Raytrace_result TraceInKdTree(Ray ray, float curr_t)
+{
+	int curr_node = 0;
+	int prev_node = -1;
+
+	if(!TraceWithBox(ray, getAABBbyIndex(0)).intersection)
+	{
+		Raytrace_result res;
+		res.intersection = false;
+		return res;
+	}
+
+	for(int i = 0; i < KdTreeAllChecked.length(); i++)
+		KdTreeAllChecked[i] = false;
+
+	while(true)
+	{
+		if(curr_node > prev_node)//moving down
 		{
-			min_t = res.t;
+			if(curr_node < node_count)//node
+			{
+				Raytrace_result withleft = TraceWithBox(ray, getAABBbyIndex(nodes[curr_node].left));
+				Raytrace_result withright = TraceWithBox(ray, getAABBbyIndex(nodes[curr_node].right));
+
+				if(withleft.intersection && withright.intersection)
+				{
+					if(withleft.t < withright.t)
+					{//left first
+						prev_node = curr_node;
+						curr_node = nodes[curr_node].left;
+					}
+					else
+					{//right first
+						prev_node = curr_node;
+						curr_node = nodes[curr_node].right;
+					}
+				}
+				else if(withleft.intersection)
+				{
+					prev_node = curr_node;
+					curr_node = nodes[curr_node].left;
+				}
+				else if(withright.intersection)
+				{
+					prev_node = curr_node;
+					curr_node = nodes[curr_node].right;
+				}			
+			}
+			else//leaf
+			{
+				Raytrace_result best_res;
+				best_res.t = curr_t;
+				best_res.intersection = false;
+				int triangle_index;
+
+				//if(curr_t > TraceWithBox(ray, getAABBbyIndex(curr_node)).t)
+				{
+					kDtree_leaf curr_leaf = leaves[curr_node - node_count];
+
+					for(int i = curr_leaf.triangle_insdexes_pos; i < curr_leaf.triangle_insdexes_pos + curr_leaf.triangle_insdexes_length; i++)
+					{
+						int tr_index = triangle_indexes_kDtree[i];
+
+						Raytrace_result res = TraceWithTriangle(ray, 
+						Triangle(vec3[](triangle_vertices[3 * tr_index].xyz, triangle_vertices[3 * tr_index + 1].xyz, triangle_vertices[3 * tr_index + 2].xyz), 0));
+
+						if(res.intersection && res.t <= best_res.t)
+						{
+							best_res = res;
+							triangle_index = tr_index;
+						}
+					}
+				}
+
+				if(best_res.intersection)
+				{
+					best_res.material_id = triangle_materials[triangle_index];
+					return best_res;
+				}
+
+				prev_node = curr_node;
+				curr_node = leaves[curr_node - node_count].parent;
+			}
+		}
+		else//moving up
+		{
+			if(KdTreeAllChecked[curr_node])
+			{//move up
+				prev_node = curr_node;
+				curr_node = nodes[curr_node].parent;
+
+				if(curr_node < 0)//reached root
+				{
+					Raytrace_result res;
+					res.intersection = false;
+					return res;
+				}
+
+				continue;
+			 }
+
+			 KdTreeAllChecked[curr_node] = true;
+
+			if(nodes[curr_node].left == prev_node)//lifting from left
+			{
+				if(TraceWithBox(ray, getAABBbyIndex(nodes[curr_node].right)).intersection)
+				{
+					prev_node = curr_node;
+					curr_node = nodes[curr_node].right;
+				}
+				else
+				{
+					prev_node = curr_node;
+					curr_node = nodes[curr_node].parent;
+
+					if(curr_node < 0)//reached root
+					{
+						Raytrace_result res;
+						res.intersection = false;
+						return res;
+					}
+				}
+			}
+			else//lifting from right
+			{
+				if(TraceWithBox(ray, getAABBbyIndex(nodes[curr_node].left)).intersection)
+				{
+					prev_node = curr_node;
+					curr_node = nodes[curr_node].left;
+				}
+				else
+				{
+					prev_node = curr_node;
+					curr_node = nodes[curr_node].parent;
+
+					if(curr_node < 0)//reached root
+					{
+						Raytrace_result res;
+						res.intersection = false;
+						return res;
+					}
+				}
+			}
+		}
+
+	}
+}
+
+Raytrace_result TraceRay(Ray ray)
+{
+	Raytrace_result result;
+	result.t = INFINITY;
+	result.intersection = false;
+
+	
+	for(int i = 0; i < spheres_amount; i++)//find sphere with min t
+	{
+		Raytrace_result res = TraceWithSphere(ray, spheres[i]);//Sphere(sphere_centers[i].xyz, sphere_radiuses[i], sphere_materials[i]));
+
+		if(res.intersection && res.t < result.t)
+		{
 			result = res;
-			result.material_id = spheres[i].material_id;
+			result.material_id = spheres[i].material_id;//sphere_materials[i];
 		}
 	}
-	#endif
+	
 
-	#if PLANES_COUNT != 0
-	for(int i = 0; i < PLANES_COUNT; i++)//find plane with min t
+	
+	for(int i = 0; i < planes_amount; i++)//find plane with min t
 	{
-		Raytrace_result res = TraceWithPlane(ray, planes[i]);
+		Raytrace_result res = TraceWithPlane(ray, planes[i]);//Plane(plane_normals[i].xyz, plane_points[i].xyz, plane_materials[i]));
 
-		if(res.intersection && res.t < min_t)
+		if(res.intersection && res.t < result.t)
 		{
-			min_t = res.t;
 			result = res;
-			result.material_id = planes[i].material_id;
+			result.material_id = planes[i].material_id;//plane_materials[i];
 		}
 	}
-	#endif
 
-	#if TRIANGLES_COUNT != 0
-	for(int i = 0; i < TRIANGLES_COUNT; i++)//find triangle with min t
-	{
-		Raytrace_result res = TraceWithTriangle(ray, triangles[i]);
+	Raytrace_result res = TraceInKdTree(ray, result.t);
 
-		if(res.intersection && res.t < min_t)
-		{
-			min_t = res.t;
-			result = res;
-			result.material_id = triangles[i].material_id;
-		}
-	}
-	#endif
+	if(res.intersection)
+		result = res;
+	
 
 	return result;
 }
@@ -334,7 +638,7 @@ vec3 GetColor(Ray ray)
 		// from 0 to refl is reflection
 		// from refl to refr + refl is refraction
 		// from refl + refr to refl + refr + emissive is emission
-		//refl + refr + emissive to 1 is diffuse
+		// from refl + refr + emissive to 1 is diffuse
 		float rand = Rand(gl_GlobalInvocationID.xy * 10);
 		
 		if(rand < material.reflective)
@@ -349,7 +653,12 @@ vec3 GetColor(Ray ray)
 			//if facing outside then 1 / mat.refraction else mat.refraction
 			float relative_refraction = pow(material.refraction, -result.normal_facing_outside);
 			 
-			current_ray.direction = refract(current_ray.direction, result.normal * result.normal_facing_outside, relative_refraction);
+			vec3 new_direction = refract(current_ray.direction, result.normal * result.normal_facing_outside, relative_refraction);
+		
+			if(EqualsZero(length(new_direction)))
+			 current_ray.direction = normalize(cross(cross(current_ray.direction, result.normal), result.normal));
+			 else
+			 current_ray.direction = new_direction;
 		}
 		else if(rand < material.reflective + material.refractive + material.emissive)
 		{//emission
@@ -400,7 +709,8 @@ void main()
 
 	current_ray.direction *= rotation_mat;
 
-	vec3 color = GetColor(current_ray);
+	vec3 color;
+	color = GetColor(current_ray);
 
 	imageStore(Texture, ivec2(gl_GlobalInvocationID.xy), vec4((color + imageLoad(Texture, ivec2(gl_GlobalInvocationID.xy)).xyz * (iteration - 1)) / iteration, 1));
 }
