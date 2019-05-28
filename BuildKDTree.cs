@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using OpenTK;
 using static Path_Tracing.Game;
 
@@ -13,6 +12,9 @@ namespace Path_Tracing
         {
             return num < ZERO && num > -ZERO;
         }
+
+        const int SAHsamples = 16;
+        const int MaxTriangles = 8;
 
         public struct AABB
         {
@@ -34,8 +36,7 @@ namespace Path_Tracing
         }
 
         static Node root;
-
-        static Triangle[] triangles;
+        static Triangle[] triangles;       
 
         public static void Build(Triangle[] tris, int depth)
         {
@@ -73,7 +74,8 @@ namespace Path_Tracing
 
             PrepareToTransfer();
         }
-
+        
+        #region prepare_to_transfer
         public struct Tree_node
         {
             public int left;
@@ -219,8 +221,7 @@ namespace Path_Tracing
             for (int i = 0; i < Prepared_leaves.Count; i++)
                 aabbs.Add(leaves[i].bounding_box);
         }
-
-        const int SAHsamples = 2;
+        #endregion
 
         static void Split(Node root, int depth, int maxdepth)
         {
@@ -233,47 +234,33 @@ namespace Path_Tracing
             root.left.triangle_indices = new List<int>();
             root.right.triangle_indices = new List<int>();
 
-            Vector3 split_plane_normal = new Vector3(1, 0, 0);
+            Vector3 split_plane_normal;
             Vector3 split_plane_position = Vector3.Zero;
             //********************optimal split plane***********************
             float min_sah = float.PositiveInfinity;
-            Vector3 normal = new Vector3(1, 0, 0);
+
+            Vector3 diagonal = root.bounding_box.max - root.bounding_box.min;        
+            //picking largest dimension
+            if(diagonal.X > diagonal.Y && diagonal.X > diagonal.Z)
+            {/*X*/split_plane_normal = new Vector3(1, 0, 0);}
+            else if(diagonal.Y > diagonal.Z)
+            {/*Y*/split_plane_normal = new Vector3(0, 1, 0);}
+            else
+            {/*Z*/split_plane_normal = new Vector3(0, 0, 1);}
+
+
             for (int i = 1; i < SAHsamples; i++)
-            {//YZ
-                Vector3 position = new Vector3(root.bounding_box.min.X + (root.bounding_box.max.X - root.bounding_box.min.X) * (i / (float)SAHsamples));
-                float curr_sah = SAH(root, normal, position);
+            {
+                Vector3 position = new Vector3(root.bounding_box.min + (root.bounding_box.max - root.bounding_box.min) * (i / (float)SAHsamples));
+                //other dimensions instread larger not matters
+
+                float curr_sah = SAH(root, split_plane_normal, position);
                 if (curr_sah < min_sah)
                 {
-                    split_plane_normal = normal;
                     split_plane_position = position;
                     min_sah = curr_sah;
                 }
-            }
-            normal = new Vector3(0, 1, 0);
-            for (int i = 1; i < SAHsamples; i++)
-            {//XZ
-                Vector3 position = new Vector3(root.bounding_box.min.Y + (root.bounding_box.max.Y - root.bounding_box.min.Y) * (i / (float)SAHsamples));
-                float curr_sah = SAH(root, normal, position);
-                if (curr_sah < min_sah)
-                {
-                    split_plane_normal = normal;
-                    split_plane_position = position;
-                    min_sah = curr_sah;
-                }
-            }
-            normal = new Vector3(0, 0, 1);
-            for (int i = 1; i < SAHsamples; i++)
-            {//XY
-                Vector3 position = new Vector3(root.bounding_box.min.Z + (root.bounding_box.max.Z - root.bounding_box.min.Z) * (i / (float)SAHsamples));
-                float curr_sah = SAH(root, normal, position);
-                if (curr_sah < min_sah)
-                {
-                    split_plane_normal = normal;
-                    split_plane_position = position;
-                    min_sah = curr_sah;
-                }
-            }
-            
+            }            
 
             //**************************************************************
             root.left.bounding_box = new AABB()
@@ -297,8 +284,93 @@ namespace Path_Tracing
                     root.left.triangle_indices.Add(root.triangle_indices[i]);
             }
 
-            Split(root.left, depth + 1, maxdepth);
-            Split(root.right, depth + 1, maxdepth);
+            if(root.left.triangle_indices.Count > MaxTriangles)
+                Split(root.left, depth + 1, maxdepth);
+            if (root.right.triangle_indices.Count > MaxTriangles)
+                Split(root.right, depth + 1, maxdepth);
+        }
+
+        static bool TrianglevsAABB(Triangle triangle, AABB aabb)
+        {
+            Vector3[] aabb_vertices = new Vector3[]
+            {
+                new Vector3(aabb.min),
+                new Vector3(aabb.max.X, aabb.min.Y, aabb.min.Z),
+                new Vector3(aabb.max.X, aabb.min.Y, aabb.max.Z),
+                new Vector3(aabb.min.X, aabb.min.Y, aabb.max.Z),
+
+                new Vector3(aabb.min.X, aabb.max.Y, aabb.max.Z),
+                new Vector3(aabb.min.X, aabb.max.Y, aabb.min.Z),
+                new Vector3(aabb.max.X, aabb.max.Y, aabb.min.Z),
+                new Vector3(aabb.max)
+            };
+            //edges are:
+            //0-1-2-3||4-5-6-7||1-2-7-6||2-3-4-7||0-3-4-5||0-1-6-5
+
+            //plane equality is normal.x * x + normal.y * y + normal.z * z + d = 0
+            Vector3 triangle_normal = Vector3.Cross(triangle.vertices[0] - triangle.vertices[1], triangle.vertices[0] - triangle.vertices[2]);
+            float triangle_d = -Vector3.Dot(triangle_normal, triangle.vertices[0]);
+
+            int box_sign = 0;
+            bool intersection = false;
+            for (int i = 0; i < 8; i++)
+            {
+                float i_vert_side = (Vector3.Dot(triangle_normal, aabb_vertices[i]) + triangle_d);
+
+                if (EqualsZero(i_vert_side))
+                    continue;
+
+                if (box_sign == 0)
+                {
+                    box_sign = i_vert_side > 0 ? 1 : -1;
+                    continue;
+                }
+
+                if ((i_vert_side > 0 ? 1 : -1) != box_sign)
+                {
+                    intersection = true;
+                    break;
+                }
+            }
+
+            if (!intersection)
+                return false;
+
+            bool CheckBoxSide(int[] points, int opposite_side_point)
+            {
+                Vector3 normal = Vector3.Cross(aabb_vertices[points[0]] - aabb_vertices[points[1]], aabb_vertices[points[0]] - aabb_vertices[points[2]]);
+                float d = -Vector3.Dot(normal, aabb_vertices[points[0]]);
+
+                int triangle_side = ((Vector3.Dot(normal, aabb_vertices[opposite_side_point]) + d) < 0) ? 1 : -1;
+                for (int i = 0; i < 3; i++)
+                {
+                    float triangle_dot_side = Vector3.Dot(normal, triangle.vertices[i]) + d;
+                    if (EqualsZero(triangle_dot_side))
+                        continue;
+
+                    int tr_dot_side = (triangle_dot_side > 0) ? 1 : -1;
+
+                    if (triangle_side != tr_dot_side)//intersection
+                        return true;
+                }
+
+                return false;//separating plane found
+            }
+
+            if (!CheckBoxSide(new int[] { 0, 1, 2 }, 4))
+                return false;
+            if (!CheckBoxSide(new int[] { 4, 5, 6 }, 0))
+                return false;
+            if (!CheckBoxSide(new int[] { 1, 2, 7 }, 0))
+                return false;
+            if (!CheckBoxSide(new int[] { 2, 3, 4 }, 0))
+                return false;
+            if (!CheckBoxSide(new int[] { 0, 3, 4 }, 7))
+                return false;
+            if (!CheckBoxSide(new int[] { 0, 1, 6 }, 7))
+                return false;
+
+            return true;
         }
 
         static float SAH(Node node, Vector3 split_plane_normal, Vector3 split_plane_position)
@@ -347,89 +419,6 @@ namespace Path_Tracing
             }
 
             return left_half_surface * left_triangles + right_half_surface * right_triangles;
-        }
-
-        static bool TrianglevsAABB(Triangle triangle, AABB aabb)
-        {
-            Vector3[] aabb_vertices = new Vector3[]
-            {
-                new Vector3(aabb.min),
-                new Vector3(aabb.max.X, aabb.min.Y, aabb.min.Z),
-                new Vector3(aabb.max.X, aabb.min.Y, aabb.max.Z),
-                new Vector3(aabb.min.X, aabb.min.Y, aabb.max.Z),
-
-                new Vector3(aabb.min.X, aabb.max.Y, aabb.max.Z),
-                new Vector3(aabb.min.X, aabb.max.Y, aabb.min.Z),
-                new Vector3(aabb.max.X, aabb.max.Y, aabb.min.Z),
-                new Vector3(aabb.max)
-            };
-            //edges are:
-            //0-1-2-3||4-5-6-7||1-2-7-6||2-3-4-7||0-3-4-5||0-1-6-5
-
-            //plane equality is normal.x * x + normal.y * y + normal.z * z + d = 0
-            Vector3 triangle_normal = Vector3.Cross(triangle.vertices[0] - triangle.vertices[1], triangle.vertices[0] - triangle.vertices[2]);
-            float triangle_d = -Vector3.Dot(triangle_normal, triangle.vertices[0]);
-
-            int box_sign = 0;
-            bool intersection = false;
-            for (int i = 0; i < 8; i++)
-            {
-                float i_vert_side = (Vector3.Dot(triangle_normal, aabb_vertices[i]) + triangle_d);
-
-                if (EqualsZero(i_vert_side))
-                    continue;
-
-                if (box_sign == 0)
-                {
-                    box_sign = i_vert_side > 0 ? 1 : -1;
-                    continue;
-                }
-
-                if((i_vert_side > 0 ? 1 : -1) != box_sign)
-                {
-                    intersection = true;
-                    break;
-                }
-            }
-
-            if (!intersection)
-                return false;
-
-            bool CheckBoxSide(int[] points, int another_point)
-            {
-                Vector3 normal = Vector3.Cross(aabb_vertices[points[0]] - aabb_vertices[points[1]], aabb_vertices[points[0]] - aabb_vertices[points[2]]);
-                float d = -Vector3.Dot(normal, aabb_vertices[points[0]]);
-
-                int triangle_side = ((Vector3.Dot(normal, aabb_vertices[another_point]) + d) < 0) ? 1 : -1;//opposite to another point
-                for(int i = 0; i < 3; i++)
-                {
-                    float triangle_dot_side = Vector3.Dot(normal, triangle.vertices[i]) + d;
-                    if (EqualsZero(triangle_dot_side))
-                        continue;
-
-                    int tr_dot_side = (triangle_dot_side > 0) ? 1 : -1;
-
-                    if (triangle_side != tr_dot_side)//intersection
-                        return true;       
-                }
-
-                return false;//separating plane found
-            }
-
-            if (!CheckBoxSide(new int[] { 0, 1, 2}, 4))
-                return false;
-            if (!CheckBoxSide(new int[] { 4, 5, 6}, 0))
-                return false;
-            if (!CheckBoxSide(new int[] { 1, 2, 7}, 0))
-                return false;
-            if (!CheckBoxSide(new int[] { 2, 3, 4}, 0))
-                return false;
-            if (!CheckBoxSide(new int[] { 0, 3, 4}, 7))
-                return false;
-            if (!CheckBoxSide(new int[] { 0, 1, 6}, 7))
-                return false;
-
-            return true;
         }
     }
 }

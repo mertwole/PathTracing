@@ -1,5 +1,5 @@
 #version 440 core
-layout( local_size_x = 16, local_size_y = 16) in;
+layout( local_size_x = 32, local_size_y = 32) in;
 
 layout (binding = 0, rgba8) uniform image2D Texture;
 
@@ -12,6 +12,7 @@ bool EqualsZero(float a)
 }
 
 uniform float rand_seed;
+vec2 pixel_position;
 
 float Rand(vec2 point)
 {
@@ -66,7 +67,7 @@ Raytrace_result TraceWithSphere(Ray ray, Sphere sphere);
 Raytrace_result TraceWithPlane(Ray ray, Plane plane);
 Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle);
 
-#define REFLECTIONS 7
+#define REFLECTIONS 8
 
 //************primitives**************************************
 
@@ -74,12 +75,12 @@ uniform int triangles_amount;
 uniform int spheres_amount;
 uniform int planes_amount;
 
-
+//*************************spheres**************
 Sphere[] spheres = 
 {
-	{vec3(0, 0, 0), 1, 6},
+	{vec3(0, 0, 0), 1, 3},
 };
-
+//***********************planes*****************
 Plane planes[] = 
 {
 	{normalize(vec3(0, 1, 0)), vec3(0, -3, 0), 3},//bottom
@@ -91,9 +92,6 @@ Plane planes[] =
 	{normalize(vec3(0, 0, 1)), vec3(0, 0, -3), 3},//far
 	{normalize(vec3(0, 0, -1)), vec3(0, 0, 3), 3}//near
 };
-
-
-
 //******************triangles*******************
 layout(std430, binding = 0) buffer tr_vertices//3 vertices per triangle
 {
@@ -126,8 +124,8 @@ struct kDtree_leaf
 
 	int index;
 
-	int triangle_insdexes_pos;
-	int triangle_insdexes_length;
+	int object_insdexes_pos;
+	int object_insdexes_length;
 };
 
 uniform int node_count;
@@ -156,40 +154,6 @@ AABB getAABBbyIndex(int index)
 {
 	return AABB(aabbs[index * 2].xyz, aabbs[index * 2 + 1].xyz);
 }
-
-//********************spheres*******************
-layout(std430, binding = 6) buffer sp_centers
-{
-	vec4 sphere_centers[];
-};
-
-layout(std430, binding = 7) buffer sp_radiuses
-{
-	float sphere_radiuses[];
-};
-
-layout(std430, binding = 8) buffer sp_materials
-{
-	int sphere_materials[];
-};
-//*******************planes***********************
-layout(std430, binding = 9) buffer pl_points
-{
-	vec4 plane_points[];
-};
-
-layout(std430, binding = 10) buffer pl_normals
-{
-	vec4 plane_normals[];
-};
-
-layout(std430, binding = 11) buffer pl_materials
-{
-	int plane_materials[];
-};
-//************************************************
-
-
 //******************materials*********************************
 
 struct Material
@@ -214,14 +178,12 @@ Material[] materials =
 	{vec3(0, 0, 0), vec3(2, 2, 2),	1.0,		0.0,	0.0,		1.00},//6
 };
 //************************camera******************************
-vec3 view_point = vec3(0, 0, 10);
-float view_distance = 7.01;
+uniform vec3 view_point;
+uniform float view_distance;
 uniform mat3 rotation_mat;
-vec2 viewport = vec2(5.99, 5.99);
-
+uniform vec2 viewport;
 uniform vec2 resolution;
-//************************************************************
-
+//**************TraceWith... functions************************
 Raytrace_result TraceWithSphere(Ray ray, Sphere sphere)
 {
 	Raytrace_result result;
@@ -419,10 +381,36 @@ Raytrace_result TraceWithBox(Ray ray, AABB box)
 
 	return result;
 }
+//*****************kDtree traversing***********************
+Raytrace_result TraceInTreeLeaf(Ray ray, int curr_node, float max_t)
+{
+	Raytrace_result best_res;
+	best_res.t = max_t;
+	best_res.intersection = false;
+	int triangle_index;
 
+	if(max_t > TraceWithBox(ray, getAABBbyIndex(curr_node)).t)
+	{
+		kDtree_leaf curr_leaf = leaves[curr_node - node_count];
 
-//************************************************************
-bool[1024] KdTreeAllChecked;
+		for(int i = curr_leaf.object_insdexes_pos; i < curr_leaf.object_insdexes_pos + curr_leaf.object_insdexes_length; i++)
+		{
+			int tr_index = triangle_indexes_kDtree[i];
+
+			Raytrace_result res = TraceWithTriangle(ray, 
+			Triangle(vec3[](triangle_vertices[3 * tr_index].xyz, triangle_vertices[3 * tr_index + 1].xyz, triangle_vertices[3 * tr_index + 2].xyz), 0));
+
+			if(res.intersection && res.t <= best_res.t)
+			{
+				best_res = res;
+				triangle_index = tr_index;
+			}
+		}
+	}
+
+	best_res.material_id = triangle_materials[triangle_index];
+	return best_res;
+}
 
 Raytrace_result TraceInKdTree(Ray ray, float curr_t)
 {
@@ -436,14 +424,18 @@ Raytrace_result TraceInKdTree(Ray ray, float curr_t)
 		return res;
 	}
 
-	for(int i = 0; i < KdTreeAllChecked.length(); i++)
-		KdTreeAllChecked[i] = false;
+	bool CheckedStack[256];
+	int CheckedStackTop = -1;
+	CheckedStack[0] = false;
 
 	while(true)
 	{
 		if(curr_node > prev_node)//moving down
 		{
-			if(curr_node < node_count)//node
+			CheckedStackTop++;
+			CheckedStack[CheckedStackTop] = false;
+
+			if(curr_node < node_count)//moving to node
 			{
 				Raytrace_result withleft = TraceWithBox(ray, getAABBbyIndex(nodes[curr_node].left));
 				Raytrace_result withright = TraceWithBox(ray, getAABBbyIndex(nodes[curr_node].right));
@@ -472,36 +464,13 @@ Raytrace_result TraceInKdTree(Ray ray, float curr_t)
 					curr_node = nodes[curr_node].right;
 				}			
 			}
-			else//leaf
+			else//moving to leaf
 			{
-				Raytrace_result best_res;
-				best_res.t = curr_t;
-				best_res.intersection = false;
-				int triangle_index;
+				Raytrace_result leaf_result = TraceInTreeLeaf(ray, curr_node, curr_t);
 
-				//if(curr_t > TraceWithBox(ray, getAABBbyIndex(curr_node)).t)
+				if(leaf_result.intersection)
 				{
-					kDtree_leaf curr_leaf = leaves[curr_node - node_count];
-
-					for(int i = curr_leaf.triangle_insdexes_pos; i < curr_leaf.triangle_insdexes_pos + curr_leaf.triangle_insdexes_length; i++)
-					{
-						int tr_index = triangle_indexes_kDtree[i];
-
-						Raytrace_result res = TraceWithTriangle(ray, 
-						Triangle(vec3[](triangle_vertices[3 * tr_index].xyz, triangle_vertices[3 * tr_index + 1].xyz, triangle_vertices[3 * tr_index + 2].xyz), 0));
-
-						if(res.intersection && res.t <= best_res.t)
-						{
-							best_res = res;
-							triangle_index = tr_index;
-						}
-					}
-				}
-
-				if(best_res.intersection)
-				{
-					best_res.material_id = triangle_materials[triangle_index];
-					return best_res;
+					return leaf_result;
 				}
 
 				prev_node = curr_node;
@@ -510,22 +479,24 @@ Raytrace_result TraceInKdTree(Ray ray, float curr_t)
 		}
 		else//moving up
 		{
-			if(KdTreeAllChecked[curr_node])
+			CheckedStackTop--;
+
+			if(CheckedStackTop < 0)//reached root
+			{
+				Raytrace_result res;
+				res.intersection = false;
+				return res;
+			}
+
+			if(CheckedStack[CheckedStackTop])
 			{//move up
 				prev_node = curr_node;
 				curr_node = nodes[curr_node].parent;
 
-				if(curr_node < 0)//reached root
-				{
-					Raytrace_result res;
-					res.intersection = false;
-					return res;
-				}
-
 				continue;
 			 }
 
-			 KdTreeAllChecked[curr_node] = true;
+			 CheckedStack[CheckedStackTop] = true;
 
 			if(nodes[curr_node].left == prev_node)//lifting from left
 			{
@@ -538,13 +509,6 @@ Raytrace_result TraceInKdTree(Ray ray, float curr_t)
 				{
 					prev_node = curr_node;
 					curr_node = nodes[curr_node].parent;
-
-					if(curr_node < 0)//reached root
-					{
-						Raytrace_result res;
-						res.intersection = false;
-						return res;
-					}
 				}
 			}
 			else//lifting from right
@@ -558,20 +522,13 @@ Raytrace_result TraceInKdTree(Ray ray, float curr_t)
 				{
 					prev_node = curr_node;
 					curr_node = nodes[curr_node].parent;
-
-					if(curr_node < 0)//reached root
-					{
-						Raytrace_result res;
-						res.intersection = false;
-						return res;
-					}
 				}
 			}
 		}
 
 	}
 }
-
+//******************************************************************
 Raytrace_result TraceRay(Ray ray)
 {
 	Raytrace_result result;
@@ -581,12 +538,12 @@ Raytrace_result TraceRay(Ray ray)
 	
 	for(int i = 0; i < spheres_amount; i++)//find sphere with min t
 	{
-		Raytrace_result res = TraceWithSphere(ray, spheres[i]);//Sphere(sphere_centers[i].xyz, sphere_radiuses[i], sphere_materials[i]));
+		Raytrace_result res = TraceWithSphere(ray, spheres[i]);
 
 		if(res.intersection && res.t < result.t)
 		{
 			result = res;
-			result.material_id = spheres[i].material_id;//sphere_materials[i];
+			result.material_id = spheres[i].material_id;
 		}
 	}
 	
@@ -594,12 +551,12 @@ Raytrace_result TraceRay(Ray ray)
 	
 	for(int i = 0; i < planes_amount; i++)//find plane with min t
 	{
-		Raytrace_result res = TraceWithPlane(ray, planes[i]);//Plane(plane_normals[i].xyz, plane_points[i].xyz, plane_materials[i]));
+		Raytrace_result res = TraceWithPlane(ray, planes[i]);
 
 		if(res.intersection && res.t < result.t)
 		{
 			result = res;
-			result.material_id = planes[i].material_id;//plane_materials[i];
+			result.material_id = planes[i].material_id;
 		}
 	}
 
@@ -639,7 +596,7 @@ vec3 GetColor(Ray ray)
 		// from refl to refr + refl is refraction
 		// from refl + refr to refl + refr + emissive is emission
 		// from refl + refr + emissive to 1 is diffuse
-		float rand = Rand(gl_GlobalInvocationID.xy * 10);
+		float rand = Rand(pixel_position * 10);
 		
 		if(rand < material.reflective)
 		{//reflection
@@ -667,15 +624,24 @@ vec3 GetColor(Ray ray)
 		else	
 		{//diffuse
 			//choosing random direction in hemisphere
-			vec3 rand_direction = normalize(vec3(Rand(gl_GlobalInvocationID.xy) * 2 - 1, Rand(gl_GlobalInvocationID.yx) * 2 - 1, Rand(gl_GlobalInvocationID.xy * 4) * 2 - 1));
+			vec3 rand_direction = normalize(vec3(Rand(pixel_position) * 2 - 1, Rand(pixel_position.yx) * 2 - 1, Rand(pixel_position * 4) * 2 - 1));
+
+			//if(dot(rand_direction, result.normal) < 0)//if not lies in hemisphere
+			//{
+			//	rand_direction *= -1;
+			//}
 
 			float a = 0.01;
 			for(int i = 0; i < 10; i++)
 			{
 				if(dot(rand_direction, result.normal) < 0)//if not lies in hemisphere
 				{
-					rand_direction = -normalize(vec3(Rand(gl_GlobalInvocationID.xy * a / 3) * 2 - 1, Rand(gl_GlobalInvocationID.yx * a * 2) * 2 - 1, Rand(gl_GlobalInvocationID.xy + ivec2(a)) * 2 - 1));//*= -1;
+					rand_direction = -normalize(vec3(Rand(pixel_position * a / 3) * 2 - 1, Rand(pixel_position.yx * a * 2) * 2 - 1, Rand(pixel_position + ivec2(a)) * 2 - 1));//*= -1;
 					a += 1;
+				}
+				else
+				{
+				break;
 				}
 			}
 			//***************************************
@@ -692,16 +658,19 @@ vec3 GetColor(Ray ray)
 
 //***********************************************************
 uniform int iteration;
+uniform vec2 offset;
 
 void main()
 { 
+	pixel_position = gl_GlobalInvocationID.xy + offset;
+
 	Ray current_ray;
 	current_ray.source = view_point;	
 
 	vec3 watch_dot = view_point;
 	watch_dot.z -= view_distance;//forward z
-	watch_dot.x += ((gl_GlobalInvocationID.x / resolution.x) - 0.5) * viewport.x;
-	watch_dot.y += ((gl_GlobalInvocationID.y / resolution.y) - 0.5) * viewport.y;
+	watch_dot.x += ((pixel_position.x / resolution.x) - 0.5) * viewport.x;
+	watch_dot.y += ((pixel_position.y / resolution.y) - 0.5) * viewport.y;
 
 	current_ray.direction = normalize(watch_dot - view_point);
 	current_ray.min_value = length(watch_dot - view_point);
@@ -709,8 +678,8 @@ void main()
 
 	current_ray.direction *= rotation_mat;
 
-	vec3 color;
-	color = GetColor(current_ray);
+	vec3 color = GetColor(current_ray);
+	vec3 new_color = (color + imageLoad(Texture, ivec2(pixel_position.xy)).xyz * (iteration - 1)) / iteration;
 
-	imageStore(Texture, ivec2(gl_GlobalInvocationID.xy), vec4((color + imageLoad(Texture, ivec2(gl_GlobalInvocationID.xy)).xyz * (iteration - 1)) / iteration, 1));
+	imageStore(Texture, ivec2(pixel_position.xy), vec4(new_color, 1));
 }

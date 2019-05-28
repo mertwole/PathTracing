@@ -12,7 +12,7 @@ namespace Path_Tracing
 
         public static List<Triangle> triangles = new List<Triangle>();
 
-        public static void Load(StreamReader stream)
+        public static void Load(StreamReader stream)//3Ds max format
         {
             normals = new List<Vector3>();
             vertices = new List<Vector3>();
