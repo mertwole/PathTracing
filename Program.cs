@@ -20,11 +20,11 @@ namespace Path_Tracing
             game.Run(120);
         }
 
-        static int window_width = 640;
-        static int window_height = 640;
-        static int image_width = 640;
-        static int image_height = 640;
-        static int workgroup_size = 32;//max 32
+        static int window_width = 960;
+        static int window_height = 540;
+        static int image_width = 1920;
+        static int image_height = 1080;
+        static int workgroup_size = 20;//max 32
         public Game() : base(window_width, window_height, new GraphicsMode(new ColorFormat(8, 8, 8, 0), 24, 8, 1/*msaa*/, new ColorFormat(8, 8, 8, 0), 2), "PathTracing")
         {
             VSync = VSyncMode.On;
@@ -86,14 +86,14 @@ namespace Path_Tracing
             GL.Uniform2(GL.GetUniformLocation(compute_shader, "resolution"), new Vector2(image_width, image_height));
             Matrix3 rotation_matrix = Matrix3.Identity;
             GL.UniformMatrix3(GL.GetUniformLocation(compute_shader, "rotation_mat"), false, ref rotation_matrix);
-            GL.Uniform3(GL.GetUniformLocation(compute_shader, "view_point"), new Vector3(0, 0, 10));
-            GL.Uniform1(GL.GetUniformLocation(compute_shader, "view_distance"), 7.01f);
-            GL.Uniform2(GL.GetUniformLocation(compute_shader, "viewport"), new Vector2(5.99f, 5.99f));
+            GL.Uniform3(GL.GetUniformLocation(compute_shader, "view_point"), new Vector3(0, 0, 15));
+            GL.Uniform1(GL.GetUniformLocation(compute_shader, "view_distance"), 12.01f);
+            GL.Uniform2(GL.GetUniformLocation(compute_shader, "viewport"), new Vector2(5.99f, 5.99f * (9f / 16f)));
             //*************************************************
             GL.Uniform1(GL.GetUniformLocation(compute_shader, "spheres_amount"), 0);
             GL.Uniform1(GL.GetUniformLocation(compute_shader, "planes_amount"), 6);
 
-            LoadPrimitivesToShader("torus.obj", 16, 2);   
+            LoadTrianglesToBuffers(modelPath + ".obj", 16, 2);   
         }
 
         public struct Triangle
@@ -101,19 +101,30 @@ namespace Path_Tracing
             public Vector3[] vertices;
         }
 
-        void LoadPrimitivesToShader(string Model_Path, int max_tree_depth, int material_id)
-        {
-            GL.UseProgram(compute_shader);
+        static string modelPath = "cube";
 
-            //*****************************triangles*****************
+        void LoadTrianglesToBuffers(string Model_Path, int max_tree_depth, int material_id)
+        {
+            GL.UseProgram(render_shader);
+
             LoadObj.Load(new StreamReader(Model_Path));
             Triangle[] triangles = LoadObj.triangles.ToArray();
 
-            Console.WriteLine("building tree...");
-            BuildKDTree.Build(triangles, max_tree_depth);
-            Console.WriteLine("tree built");
+            try
+            {
+                StreamReader cachedTree = new StreamReader(modelPath + ".tree");
+                BuildKDTree.LoadFromJson(cachedTree);
+                Console.WriteLine("cached tree found");
+            }
+            catch
+            {
+                Console.WriteLine("building tree...");
+                BuildKDTree.Build(triangles, max_tree_depth);
+                BuildKDTree.CacheIntoJson(new StreamWriter(modelPath + ".tree"));
+                Console.WriteLine("tree built");
+            }
 
-            GL.Uniform1(GL.GetUniformLocation(compute_shader, "triangles_amount"), triangles.Length);
+            GL.Uniform1(GL.GetUniformLocation(render_shader, "triangles_amount"), triangles.Length);
 
             int triangle_vertices = GL.GenBuffer(),
             triangle_materials = GL.GenBuffer();
@@ -139,30 +150,29 @@ namespace Path_Tracing
                 triangle_indexes = GL.GenBuffer(),
                 aabbs = GL.GenBuffer();
 
-            GL.Uniform1(GL.GetUniformLocation(compute_shader, "node_count"), BuildKDTree.Prepared_nodes.Count);
+            GL.Uniform1(GL.GetUniformLocation(render_shader, "node_count"), BuildKDTree.preparedTreeData.nodes.Count);
 
             GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2, nodes);
-            GL.BufferData(BufferTarget.ShaderStorageBuffer, 
-                sizeof(int) * 4 * BuildKDTree.Prepared_nodes.Count, BuildKDTree.Prepared_nodes.ToArray(), BufferUsageHint.StaticDraw);
+            GL.BufferData(BufferTarget.ShaderStorageBuffer,
+                sizeof(int) * 4 * BuildKDTree.preparedTreeData.nodes.Count, BuildKDTree.preparedTreeData.nodes.ToArray(), BufferUsageHint.StaticDraw);
 
             GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 3, leaves);
             GL.BufferData(BufferTarget.ShaderStorageBuffer,
-                sizeof(int) * 4 * BuildKDTree.Prepared_leaves.Count, BuildKDTree.Prepared_leaves.ToArray(), BufferUsageHint.StaticDraw);
+                sizeof(int) * 4 * BuildKDTree.preparedTreeData.leaves.Count, BuildKDTree.preparedTreeData.leaves.ToArray(), BufferUsageHint.StaticDraw);
 
             GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 4, triangle_indexes);
             GL.BufferData(BufferTarget.ShaderStorageBuffer,
-                sizeof(int) * BuildKDTree.triangle_indexes_tree.Count, BuildKDTree.triangle_indexes_tree.ToArray(), BufferUsageHint.StaticDraw);
+                sizeof(int) * BuildKDTree.preparedTreeData.triangle_indexes_tree.Count, BuildKDTree.preparedTreeData.triangle_indexes_tree.ToArray(), BufferUsageHint.StaticDraw);
 
             List<Vector4> aabb_verts = new List<Vector4>();
-            for(int i = 0; i < BuildKDTree.aabbs.Count; i++)
+            foreach (var aabb in BuildKDTree.preparedTreeData.aabbs)
             {
-                aabb_verts.Add(new Vector4(BuildKDTree.aabbs[i].min, 1));
-                aabb_verts.Add(new Vector4(BuildKDTree.aabbs[i].max, 1));
+                aabb_verts.Add(new Vector4(aabb.min_x, aabb.min_y, aabb.min_z, 1));
+                aabb_verts.Add(new Vector4(aabb.max_x, aabb.max_y, aabb.max_z, 1));
             }
             GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5, aabbs);
-            GL.BufferData(BufferTarget.ShaderStorageBuffer, sizeof(float) * 8 * BuildKDTree.aabbs.Count,
+            GL.BufferData(BufferTarget.ShaderStorageBuffer, sizeof(float) * 8 * BuildKDTree.preparedTreeData.aabbs.Count,
                 aabb_verts.ToArray(), BufferUsageHint.StaticDraw);
-            //********************************************************
         }
 
         int iterations = 1;
@@ -191,7 +201,7 @@ namespace Path_Tracing
 
                     if (savebitmapflag)
                     {
-                        SaveBitmap(output_bitmap_name + ".bmp");
+                        SaveBitmap();
                         savebitmapflag = false;
                     }
                 }
@@ -204,8 +214,6 @@ namespace Path_Tracing
             GL.DispatchCompute(1, 1, 1);
             GL.MemoryBarrier(MemoryBarrierFlags.AllBarrierBits);     
         }
-
-        string output_bitmap_name = "torus";
 
         protected override void OnRenderFrame(FrameEventArgs E)
         {
@@ -237,7 +245,7 @@ namespace Path_Tracing
 
         bool savebitmapflag = false;
 
-        void SaveBitmap(string name)
+        void SaveBitmap()
         {
             Bitmap bmp = new Bitmap(image_width, image_height);
 
@@ -263,7 +271,7 @@ namespace Path_Tracing
             GraphicsUnit.Pixel, attributes);
             //****************
 
-            gamma_corrected_bitmap.Save(name, ImageFormat.Bmp);
+            gamma_corrected_bitmap.Save(modelPath + ".bmp", ImageFormat.Bmp);
             Console.WriteLine("saved");
 
             gamma_corrected_bitmap.Dispose();

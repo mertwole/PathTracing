@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using OpenTK;
 using static Path_Tracing.Game;
+using Newtonsoft.Json;
+using System.IO;
 
 namespace Path_Tracing
 {
@@ -95,10 +97,37 @@ namespace Path_Tracing
             public int triangle_insdexes_length;
         }
 
-        public static List<Tree_node> Prepared_nodes;
-        public static List<Tree_leaf> Prepared_leaves;
-        public static List<int> triangle_indexes_tree;
-        public static List<AABB> aabbs;
+        public struct SerializableAABB
+        {
+            public SerializableAABB(AABB aabb)
+            {
+                min_x = aabb.min.X;
+                min_y = aabb.min.Y;
+                min_z = aabb.min.Z;
+
+                max_x = aabb.max.X;
+                max_y = aabb.max.Y;
+                max_z = aabb.max.Z;
+            }
+
+            public float min_x;
+            public float min_y;
+            public float min_z;
+
+            public float max_x;
+            public float max_y;
+            public float max_z;
+        }
+
+        public class PreparedTreeData
+        {
+            public List<Tree_node> nodes;
+            public List<Tree_leaf> leaves;
+            public List<int> triangle_indexes_tree;
+            public List<SerializableAABB> aabbs;
+        }
+
+        public static PreparedTreeData preparedTreeData = new PreparedTreeData();
 
         static void PrepareToTransfer()
         {
@@ -138,12 +167,12 @@ namespace Path_Tracing
             for (int i = 0; i < leaves.Count; i++)
                 leaves[i].global_id = i + nodes.Count;
 
-            Prepared_leaves = new List<Tree_leaf>(leaves.Count);
-            Prepared_nodes = new List<Tree_node>(nodes.Count);
+            preparedTreeData.leaves = new List<Tree_leaf>(leaves.Count);
+            preparedTreeData.nodes = new List<Tree_node>(nodes.Count);
 
-            Prepared_nodes.Add(new Tree_node() { index = 0, left = nodes[0].left.global_id, right = nodes[0].right.global_id, parent = -1 });//root
+            preparedTreeData.nodes.Add(new Tree_node() { index = 0, left = nodes[0].left.global_id, right = nodes[0].right.global_id, parent = -1 });//root
 
-            triangle_indexes_tree = new List<int>(); 
+            preparedTreeData.triangle_indexes_tree = new List<int>(); 
 
             curr_layer = new List<Node>();
             curr_layer.Add(root);
@@ -159,7 +188,7 @@ namespace Path_Tracing
                         new_layer.Add(curr_layer[i].right);
                         
                         if (curr_layer[i].left.left != null)//left isnt leaf
-                            Prepared_nodes.Add(new Tree_node()
+                            preparedTreeData.nodes.Add(new Tree_node()
                             {
                                 index = curr_layer[i].left.global_id,
                                 left = curr_layer[i].left.left.global_id,
@@ -168,11 +197,11 @@ namespace Path_Tracing
                             });
                         else//left is leaf
                         {
-                            int ind_pos = triangle_indexes_tree.Count;
-                            triangle_indexes_tree.AddRange(curr_layer[i].left.triangle_indices);
+                            int ind_pos = preparedTreeData.triangle_indexes_tree.Count;
+                            preparedTreeData.triangle_indexes_tree.AddRange(curr_layer[i].left.triangle_indices);
                             int ind_length = curr_layer[i].left.triangle_indices.Count;
 
-                            Prepared_leaves.Add(new Tree_leaf()
+                            preparedTreeData.leaves.Add(new Tree_leaf()
                             {
                                 index = curr_layer[i].left.global_id,
                                 parent = curr_layer[i].global_id,
@@ -182,7 +211,7 @@ namespace Path_Tracing
                         }
 
                         if (curr_layer[i].right.left != null)//right isnt leaf
-                            Prepared_nodes.Add(new Tree_node()
+                            preparedTreeData.nodes.Add(new Tree_node()
                             {
                                 index = curr_layer[i].right.global_id,
                                 left = curr_layer[i].right.left.global_id,
@@ -191,11 +220,11 @@ namespace Path_Tracing
                             });
                         else//right is leaf
                         {
-                            int ind_pos = triangle_indexes_tree.Count;
-                            triangle_indexes_tree.AddRange(curr_layer[i].right.triangle_indices);
+                            int ind_pos = preparedTreeData.triangle_indexes_tree.Count;
+                            preparedTreeData.triangle_indexes_tree.AddRange(curr_layer[i].right.triangle_indices);
                             int ind_length = curr_layer[i].right.triangle_indices.Count;
 
-                            Prepared_leaves.Add(new Tree_leaf()
+                            preparedTreeData.leaves.Add(new Tree_leaf()
                             {
                                 index = curr_layer[i].right.global_id,
                                 parent = curr_layer[i].global_id,
@@ -212,16 +241,29 @@ namespace Path_Tracing
                 curr_layer = new_layer;
             }
 
-            Prepared_leaves.Sort((x, y) => x.index > y.index ? 1 : -1);
-            Prepared_nodes.Sort((x, y) => x.index > y.index ? 1 : -1);
+            preparedTreeData.leaves.Sort((x, y) => x.index > y.index ? 1 : -1);
+            preparedTreeData.nodes.Sort((x, y) => x.index > y.index ? 1 : -1);
 
-            aabbs = new List<AABB>();
-            for (int i = 0; i < Prepared_nodes.Count; i++)
-                aabbs.Add(nodes[i].bounding_box);
-            for (int i = 0; i < Prepared_leaves.Count; i++)
-                aabbs.Add(leaves[i].bounding_box);
+            preparedTreeData.aabbs = new List<SerializableAABB>();
+            for (int i = 0; i < preparedTreeData.nodes.Count; i++)
+                preparedTreeData.aabbs.Add(new SerializableAABB(nodes[i].bounding_box));
+            for (int i = 0; i < preparedTreeData.leaves.Count; i++)
+                preparedTreeData.aabbs.Add(new SerializableAABB(leaves[i].bounding_box));
         }
         #endregion
+
+        public static void CacheIntoJson(StreamWriter writer)
+        {
+            string serialized = JsonConvert.SerializeObject(preparedTreeData);
+            writer.Write(serialized);
+            writer.Close();
+        }
+
+        public static void LoadFromJson(StreamReader reader)
+        {
+            preparedTreeData = JsonConvert.DeserializeObject<PreparedTreeData>(reader.ReadToEnd());
+            reader.Close();
+        }
 
         static void Split(Node root, int depth, int maxdepth)
         {
