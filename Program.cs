@@ -20,11 +20,11 @@ namespace Path_Tracing
             game.Run(120);
         }
 
-        static int window_width = 960;
-        static int window_height = 540;
-        static int image_width = 1920;
-        static int image_height = 1080;
-        static int workgroup_size = 20;//max 32
+        static int window_width = 512;
+        static int window_height = 512;
+        static int image_width = 512;
+        static int image_height = 512;
+        static int workgroup_size = 32;//max 32
         public Game() : base(window_width, window_height, new GraphicsMode(new ColorFormat(8, 8, 8, 0), 24, 8, 1/*msaa*/, new ColorFormat(8, 8, 8, 0), 2), "PathTracing")
         {
             VSync = VSyncMode.On;
@@ -80,20 +80,22 @@ namespace Path_Tracing
             texture = GL.GenTexture();
             GL.BindTexture(TextureTarget.Texture2D, texture);
             GL.TexStorage2D(TextureTarget2d.Texture2D, 1, SizedInternalFormat.Rgba8, image_width, image_height);
+            GL.TextureParameter(texture, TextureParameterName.TextureMinFilter, (int)All.Linear);
+            GL.TextureParameter(texture, TextureParameterName.TextureMagFilter, (int)All.Linear);
             GL.BindImageTexture(0, texture, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba8);
 
             //*******************camera setup*******************
             GL.Uniform2(GL.GetUniformLocation(compute_shader, "resolution"), new Vector2(image_width, image_height));
             Matrix3 rotation_matrix = Matrix3.Identity;
             GL.UniformMatrix3(GL.GetUniformLocation(compute_shader, "rotation_mat"), false, ref rotation_matrix);
-            GL.Uniform3(GL.GetUniformLocation(compute_shader, "view_point"), new Vector3(0, 0, 15));
-            GL.Uniform1(GL.GetUniformLocation(compute_shader, "view_distance"), 12.01f);
-            GL.Uniform2(GL.GetUniformLocation(compute_shader, "viewport"), new Vector2(5.99f, 5.99f * (9f / 16f)));
+            GL.Uniform3(GL.GetUniformLocation(compute_shader, "view_point"), new Vector3(0, 0, 10));
+            GL.Uniform1(GL.GetUniformLocation(compute_shader, "view_distance"), 7.01f);
+            GL.Uniform2(GL.GetUniformLocation(compute_shader, "viewport"), new Vector2(5.99f, 5.99f));
             //*************************************************
             GL.Uniform1(GL.GetUniformLocation(compute_shader, "spheres_amount"), 0);
             GL.Uniform1(GL.GetUniformLocation(compute_shader, "planes_amount"), 6);
 
-            LoadTrianglesToBuffers(modelPath + ".obj", 16, 2);   
+            LoadTrianglesToBuffers(modelPath + ".obj", 10, 2);   
         }
 
         public struct Triangle
@@ -101,19 +103,18 @@ namespace Path_Tracing
             public Vector3[] vertices;
         }
 
-        static string modelPath = "cube";
+        static string modelPath = "sphere";
 
         void LoadTrianglesToBuffers(string Model_Path, int max_tree_depth, int material_id)
         {
-            GL.UseProgram(render_shader);
+            GL.UseProgram(compute_shader);
 
             LoadObj.Load(new StreamReader(Model_Path));
             Triangle[] triangles = LoadObj.triangles.ToArray();
 
             try
             {
-                StreamReader cachedTree = new StreamReader(modelPath + ".tree");
-                BuildKDTree.LoadFromJson(cachedTree);
+                BuildKDTree.LoadFromJson(new StreamReader(modelPath + ".tree"));
                 Console.WriteLine("cached tree found");
             }
             catch
@@ -124,7 +125,7 @@ namespace Path_Tracing
                 Console.WriteLine("tree built");
             }
 
-            GL.Uniform1(GL.GetUniformLocation(render_shader, "triangles_amount"), triangles.Length);
+            GL.Uniform1(GL.GetUniformLocation(compute_shader, "triangles_amount"), triangles.Length);
 
             int triangle_vertices = GL.GenBuffer(),
             triangle_materials = GL.GenBuffer();
@@ -150,7 +151,7 @@ namespace Path_Tracing
                 triangle_indexes = GL.GenBuffer(),
                 aabbs = GL.GenBuffer();
 
-            GL.Uniform1(GL.GetUniformLocation(render_shader, "node_count"), BuildKDTree.preparedTreeData.nodes.Count);
+            GL.Uniform1(GL.GetUniformLocation(compute_shader, "node_count"), BuildKDTree.preparedTreeData.nodes.Count);
 
             GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2, nodes);
             GL.BufferData(BufferTarget.ShaderStorageBuffer,
@@ -184,7 +185,7 @@ namespace Path_Tracing
             GL.UseProgram(compute_shader);
 
             GL.Uniform1(GL.GetUniformLocation(compute_shader, "iteration"), iterations);
-
+            GL.Uniform1(GL.GetUniformLocation(compute_shader, "rand_seed"), (rand.Next(1000000)) / 1000000f);
             GL.Uniform2(GL.GetUniformLocation(compute_shader, "offset"), offset);
             offset.X += workgroup_size;
             if(offset.X >= image_width)
@@ -197,8 +198,7 @@ namespace Path_Tracing
                     offset.Y = 0;
                     Console.WriteLine(iterations);
                     iterations++;                    
-                    GL.Uniform1(GL.GetUniformLocation(compute_shader, "rand_seed"), (rand.Next(1000000)) / 1000000f);
-
+                    
                     if (savebitmapflag)
                     {
                         SaveBitmap();
@@ -206,9 +206,7 @@ namespace Path_Tracing
                     }
                 }
             }
-            
             //************
-
 
             GL.MemoryBarrier(MemoryBarrierFlags.AllBarrierBits);
             GL.DispatchCompute(1, 1, 1);
@@ -219,6 +217,7 @@ namespace Path_Tracing
         {
             base.OnRenderFrame(E);
 
+            for(int i = 0; i < 1; i++)
             TracePath_Single();
 
             GL.BindVertexArray(VAO);

@@ -67,7 +67,7 @@ Raytrace_result TraceWithSphere(Ray ray, Sphere sphere);
 Raytrace_result TraceWithPlane(Ray ray, Plane plane);
 Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle);
 
-#define REFLECTIONS 8
+#define REFLECTIONS 4
 
 //************primitives**************************************
 
@@ -76,18 +76,21 @@ uniform int spheres_amount;
 uniform int planes_amount;
 
 //*************************spheres**************
-Sphere[] spheres = 
+const Sphere[] spheres = 
 {
-	{vec3(0, 0, 0), 1, 3},
+	{vec3(0, 3, 0), 1, 2},
+	{vec3(0, -2, 0), 1, 2},
+	{vec3(-2, -2.5, 0), 0.5, 3},
+	{vec3(2, -2.5, 0), 0.5, 3}
 };
 //***********************planes*****************
-Plane planes[] = 
+const Plane planes[] = 
 {
-	{normalize(vec3(0, 1, 0)), vec3(0, -3, 0), 3},//bottom
-	{normalize(vec3(0, -1, 0)), vec3(0, 3, 0), 6},//top
+	{normalize(vec3(0, 1, 0)), vec3(0, -3, 0), 0},//bottom
+	{normalize(vec3(0, -1, 0)), vec3(0, 3, 0), 1},//top
 
-	{normalize(vec3(-1, 0, 0)), vec3(3, 0, 0), 0},//right
-	{normalize(vec3(1, 0, 0)), vec3(-3, 0, 0), 1},//left
+	{normalize(vec3(-1, 0, 0)), vec3(3, 0, 0), 6},//right
+	{normalize(vec3(1, 0, 0)), vec3(-3, 0, 0), 6},//left
 
 	{normalize(vec3(0, 0, 1)), vec3(0, 0, -3), 3},//far
 	{normalize(vec3(0, 0, -1)), vec3(0, 0, 3), 3}//near
@@ -169,13 +172,14 @@ struct Material
 
 Material[] materials = 
 {//  color          emission		emissive reflective refractive refraction
-	{vec3(1, 0, 0), vec3(1, 1, 1),	0.0,		0.0,	0.0,		1.00},//0
-	{vec3(0, 1, 0), vec3(1, 1, 1),	0.0,		0.0,	0.0,		1.00},//1
-	{vec3(0, 0, 1), vec3(0, 0, 0),	0.0,		0.5,	0.0,		1.00},//2
+	{vec3(1, 0, 0), vec3(1, 0, 0),	0.01,		0.0,	0.0,		1.00},//0
+	{vec3(0, 1, 0), vec3(0, 1, 0),	0.01,		0.0,	0.0,		1.00},//1
+	{vec3(1, 1, 1), vec3(0, 0, 0),	0.0,		0.2,	0.0,		1.00},//2
 	{vec3(0.5),     vec3(0, 0, 0),	0.0,		0.0,	0.0,		1.00},//3
 	{vec3(0.5),		vec3(0, 0, 0),	0.0,		0.0,	1.0,		1.20},//4
 	{vec3(1, 1, 1), vec3(0, 0, 0),	0.0,		0.0,	0.0,		1.00},//5
 	{vec3(0, 0, 0), vec3(2, 2, 2),	1.0,		0.0,	0.0,		1.00},//6
+	{vec3(1, 1, 1), vec3(1, 1, 1),	0.5,		0.0,	0.0,		1.00},//7
 };
 //************************camera******************************
 uniform vec3 view_point;
@@ -300,6 +304,37 @@ Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle)
 	return result;
 }
 
+Raytrace_result TraceWithBox_new(Ray ray, AABB box)
+{
+	Raytrace_result result;
+
+	vec3 dirfrac = vec3(1) / ray.direction;
+
+	if(EqualsZero(dirfrac.x))
+		dirfrac.x = ZERO;
+	if(EqualsZero(dirfrac.y))
+		dirfrac.y = ZERO;
+	if(EqualsZero(dirfrac.z))
+		dirfrac.z = ZERO;
+
+	vec3 t0 = (box._min - ray.source) * dirfrac;
+	vec3 t1 = (box._max - ray.source) * dirfrac;
+
+	float tmin = max(max(min(t0.x, t1.x), min(t0.y, t1.y)), min(t0.z, t1.z));
+	float tmax = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z));
+
+	result.intersection = tmin < tmax;
+
+	if(tmin > ray.min_value && tmin < ray.max_value)
+		result.t = tmin;
+	else if(tmax > ray.min_value && tmax < ray.max_value)
+		result.t = tmax;
+	else
+		result.intersection = false;
+
+	return result;
+}
+
 Raytrace_result TraceWithBox(Ray ray, AABB box)
 {
 	Raytrace_result result;
@@ -369,14 +404,14 @@ Raytrace_result TraceWithBox(Ray ray, AABB box)
 	if(tmin < ray.max_value && tmin > ray.min_value)
 	{
 		result.t = tmin;
-		result.intersection = true;
 		result.contact = ray.source + ray.direction * tmin;
+		result.intersection = true;
 	}
 	else if(tmax < ray.max_value && tmax > ray.min_value)
 	{
 		result.t = tmax;
-		result.intersection = true;
 		result.contact = ray.source + ray.direction * tmax;
+		result.intersection = true;
 	}
 
 	return result;
@@ -560,10 +595,13 @@ Raytrace_result TraceRay(Ray ray)
 		}
 	}
 
-	Raytrace_result res = TraceInKdTree(ray, result.t);
+	if(triangles_amount != 0)
+	{
+		Raytrace_result res = TraceInKdTree(ray, result.t);
 
-	if(res.intersection)
-		result = res;
+		if(res.intersection)
+			result = res;
+	}
 	
 
 	return result;
@@ -581,9 +619,7 @@ vec3 GetColor(Ray ray)
 		Raytrace_result result = TraceRay(current_ray);	
 
 		if(!result.intersection)
-		{
 			return vec3(0);
-		}
 
 		Material material = materials[result.material_id];		
 
@@ -596,7 +632,7 @@ vec3 GetColor(Ray ray)
 		// from refl to refr + refl is refraction
 		// from refl + refr to refl + refr + emissive is emission
 		// from refl + refr + emissive to 1 is diffuse
-		float rand = Rand(pixel_position * 10);
+		float rand = Rand(pixel_position);
 		
 		if(rand < material.reflective)
 		{//reflection
@@ -604,9 +640,6 @@ vec3 GetColor(Ray ray)
 		}
 		else if(rand < material.reflective + material.refractive)
 		{//refraction
-			float a_c = dot(result.normal * result.normal_facing_outside, current_ray.direction);
-			float a_s = sqrt(1 - a_c * a_c);
-			
 			//if facing outside then 1 / mat.refraction else mat.refraction
 			float relative_refraction = pow(material.refraction, -result.normal_facing_outside);
 			 
@@ -614,7 +647,7 @@ vec3 GetColor(Ray ray)
 		
 			if(EqualsZero(length(new_direction)))
 			 current_ray.direction = normalize(cross(cross(current_ray.direction, result.normal), result.normal));
-			 else
+			else
 			 current_ray.direction = new_direction;
 		}
 		else if(rand < material.reflective + material.refractive + material.emissive)
@@ -623,28 +656,11 @@ vec3 GetColor(Ray ray)
 		}
 		else	
 		{//diffuse
-			//choosing random direction in hemisphere
-			vec3 rand_direction = normalize(vec3(Rand(pixel_position) * 2 - 1, Rand(pixel_position.yx) * 2 - 1, Rand(pixel_position * 4) * 2 - 1));
+			//selecting random direction in hemisphere
+			vec3 rand_direction = normalize(vec3(Rand(pixel_position) * 2 - 1, Rand(pixel_position + vec2(1, 0)) * 2 - 1, Rand(pixel_position + vec2(0, 1)) * 2 - 1));
 
-			//if(dot(rand_direction, result.normal) < 0)//if not lies in hemisphere
-			//{
-			//	rand_direction *= -1;
-			//}
-
-			float a = 0.01;
-			for(int i = 0; i < 10; i++)
-			{
-				if(dot(rand_direction, result.normal) < 0)//if not lies in hemisphere
-				{
-					rand_direction = -normalize(vec3(Rand(pixel_position * a / 3) * 2 - 1, Rand(pixel_position.yx * a * 2) * 2 - 1, Rand(pixel_position + ivec2(a)) * 2 - 1));//*= -1;
-					a += 1;
-				}
-				else
-				{
-				break;
-				}
-			}
-			//***************************************
+			// flip vector that not in hemisphere
+			rand_direction *= sign(sign(dot(rand_direction, result.normal) + ZERO) + 0.5);
 
 			current_ray.direction = rand_direction;
 

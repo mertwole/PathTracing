@@ -28,41 +28,20 @@ namespace Path_Tracing
                 if (curr_line.Length < 3)
                     continue;
 
-                if(curr_line.Substring(0, 3) == "v  ")
+                if(curr_line.Substring(0, 2) == "v ")
                 {//vertex
-                    curr_line = curr_line.Replace('.', ',');
-                    //line is "v {x} {y} {z}"
-                    curr_line = curr_line.Substring(3);
-                    //line is "{x} {y} {z}"
-                    int spacepos = curr_line.IndexOf(' ');
-                    float.TryParse(curr_line.Substring(0, spacepos), out float x);
-                    curr_line = curr_line.Substring(spacepos + 1, curr_line.Length - spacepos - 1);
-                    //line is "{y} {z}"
-                    spacepos = curr_line.IndexOf(' ');
-                    float.TryParse(curr_line.Substring(0, spacepos), out float y);
-                    curr_line = curr_line.Substring(spacepos + 1, curr_line.Length - spacepos - 1);
-                    //line is "{z}"
-                    float.TryParse(curr_line, out float z);
+                    var vert = ParseStringToEnumarator(curr_line);
 
-                    vertices.Add(new Vector3(x, y, z));
-                }
-                else if (curr_line.Substring(0, 3) == "vn ")
-                {//normal
-                    curr_line = curr_line.Replace('.', ',');
-                    //line is "vn {x} {y} {z}"
-                    curr_line = curr_line.Substring(3);
-                    //line is "{x} {y} {z}"
-                    int spacepos = curr_line.IndexOf(' ');
-                    float.TryParse(curr_line.Substring(0, spacepos), out float x);
-                    curr_line = curr_line.Substring(spacepos + 1, curr_line.Length - spacepos - 1);
-                    //line is "{y} {z}"
-                    spacepos = curr_line.IndexOf(' ');
-                    float.TryParse(curr_line.Substring(0, spacepos), out float y);
-                    curr_line = curr_line.Substring(spacepos + 1, curr_line.Length - spacepos - 1);
-                    //line is "{z}"
-                    float.TryParse(curr_line, out float z);
+                    Vector3 new_vert = new Vector3();
 
-                    normals.Add(new Vector3(x, y, z));
+                    vert.MoveNext();
+                    new_vert.X = vert.Current;
+                    vert.MoveNext();
+                    new_vert.Y = vert.Current;
+                    vert.MoveNext();
+                    new_vert.Z = vert.Current;
+
+                    vertices.Add(new_vert);
                 }
             }
 
@@ -84,21 +63,14 @@ namespace Path_Tracing
                     Triangle triangle = new Triangle();
                     int[] verts = new int[3];
 
-                    //line is "f {vertex_num}//blah {vertex_num}//blah {vertex_num}//blah"
-                    curr_line = curr_line.Substring(2);
-                    //line is "{vertex_num}//blah {vertex_num}//blah {vertex_num}//blah"
-                    int slash_pos = curr_line.IndexOf("//");
-                    int space_pos = curr_line.IndexOf(' ');
-                    int.TryParse(curr_line.Substring(0, slash_pos), out verts[0]);
-                    curr_line = curr_line.Substring(space_pos + 1);
-                    //line is "{vertex_num}//blah {vertex_num}//blah"
-                    slash_pos = curr_line.IndexOf("//");
-                    space_pos = curr_line.IndexOf(' ');
-                    int.TryParse(curr_line.Substring(0, slash_pos), out verts[1]);
-                    curr_line = curr_line.Substring(space_pos + 1);
-                    //line is "{vertex_num}"
-                    slash_pos = curr_line.IndexOf("//");
-                    int.TryParse(curr_line.Substring(0, slash_pos), out verts[2]);
+                    var face = ParseStringToEnumaratorI(curr_line);
+
+                    face.MoveNext();
+                    verts[0] = face.Current;
+                    face.MoveNext();
+                    verts[1] = face.Current;
+                    face.MoveNext();
+                    verts[2] = face.Current;
 
                     triangle.vertices = new Vector3[]
                     {
@@ -108,6 +80,73 @@ namespace Path_Tracing
                     };
 
                     triangles.Add(triangle);
+                }
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        static List<char> allowed_chars = new List<char>() { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '-' };
+
+        static IEnumerator<float> ParseStringToEnumarator(string input)
+        {
+            input = input + " ";
+
+            List<char> curr_num = new List<char>();
+
+            foreach (char ch in input)
+            {
+                if (allowed_chars.Contains(ch))
+                    curr_num.Add(ch);
+                else if (curr_num.Count != 0)
+                {
+                    float.TryParse(new string(curr_num.ToArray()), out float i);
+                    yield return i;
+                    curr_num = new List<char>();
+                }
+            }
+        }
+
+        static List<char> allowed_charsI = new List<char>() { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' };
+
+        static IEnumerator<int> ParseStringToEnumaratorI(string input)
+        {
+            input = input + " ";
+
+            List<char> curr_num = new List<char>();
+
+            foreach (char ch in input)
+            {
+                if (allowed_charsI.Contains(ch))
+                    curr_num.Add(ch);
+                else if (curr_num.Count != 0)
+                {
+                    int.TryParse(new string(curr_num.ToArray()), out int i);
+                    yield return i;
+                    curr_num = new List<char>();
                 }
             }
         }
