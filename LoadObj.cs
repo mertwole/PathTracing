@@ -92,9 +92,7 @@ namespace Path_Tracing
 
         static IEnumerator<float> ParseStringToEnumarator(string input)
         {
-            input = input + " ";
-
-            input.Replace('.', ',');
+            input = input.Replace('.', ',') + " ";
 
             List<char> curr_num = new List<char>();
 

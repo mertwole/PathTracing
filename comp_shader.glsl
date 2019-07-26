@@ -1,5 +1,5 @@
 #version 440 core
-layout( local_size_x = 2, local_size_y = 2) in;
+layout( local_size_x = 4, local_size_y = 4) in;
 
 layout (binding = 0, rgba8) uniform image2D Texture;
 
