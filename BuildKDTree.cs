@@ -3,6 +3,7 @@ using OpenTK;
 using static Path_Tracing.Game;
 using Newtonsoft.Json;
 using System.IO;
+using System.Threading;
 
 namespace Path_Tracing
 {
@@ -10,7 +11,7 @@ namespace Path_Tracing
     {
         const float ZERO = 0.000001f;
 
-        static bool EqualsZero(float num)
+        bool EqualsZero(float num)
         {
             return num < ZERO && num > -ZERO;
         }
@@ -37,10 +38,10 @@ namespace Path_Tracing
             public int global_id;
         }
 
-        static Node root;
-        static Triangle[] triangles;       
+        Node root;
+        Triangle[] triangles;       
 
-        public static void Build(Triangle[] tris, int depth)
+        public void Build(Triangle[] tris, int depth)
         {
             triangles = tris;
 
@@ -72,11 +73,34 @@ namespace Path_Tracing
             for(int i = 0; i < triangles.Length; i++)
                 root.triangle_indices.Add(i);
 
-            Split(root, 0, depth);
+            try // use multithreading
+            {
+                Split(root, 0, 3);
+
+                Thread subroot_0 = new Thread(new ParameterizedThreadStart(Split));
+                Thread subroot_1 = new Thread(new ParameterizedThreadStart(Split));
+                Thread subroot_2 = new Thread(new ParameterizedThreadStart(Split));
+                Thread subroot_3 = new Thread(new ParameterizedThreadStart(Split));
+
+                subroot_0.Start(new SplitData(root.left.left, 3, depth - 3));
+                subroot_1.Start(new SplitData(root.left.right, 3, depth - 3));
+                subroot_2.Start(new SplitData(root.right.left, 3, depth - 3));
+                subroot_3.Start(new SplitData(root.right.right, 3, depth - 3));
+
+                subroot_0.Join();
+                subroot_1.Join();
+                subroot_2.Join();
+                subroot_3.Join();
+            }
+            catch // tree depth <= 3 , cannot use multithreading
+            {
+                Split(root, 0, depth);
+            }
+            
 
             PrepareToTransfer();
         }
-        
+
         #region prepare_to_transfer
         public struct Tree_node
         {
@@ -127,9 +151,9 @@ namespace Path_Tracing
             public List<SerializableAABB> aabbs;
         }
 
-        public static PreparedTreeData preparedTreeData = new PreparedTreeData();
+        public PreparedTreeData preparedTreeData = new PreparedTreeData();
 
-        static void PrepareToTransfer()
+        void PrepareToTransfer()
         {
             List<Node> nodes = new List<Node>();
             List<Node> leaves = new List<Node>();
@@ -252,20 +276,40 @@ namespace Path_Tracing
         }
         #endregion
 
-        public static void CacheIntoJson(StreamWriter writer)
+        public void CacheIntoJson(StreamWriter writer)
         {
             string serialized = JsonConvert.SerializeObject(preparedTreeData);
             writer.Write(serialized);
             writer.Close();
         }
 
-        public static void LoadFromJson(StreamReader reader)
+        public void LoadFromJson(StreamReader reader)
         {
             preparedTreeData = JsonConvert.DeserializeObject<PreparedTreeData>(reader.ReadToEnd());
             reader.Close();
         }
 
-        static void Split(Node root, int depth, int maxdepth)
+        class SplitData
+        {
+            public SplitData(Node _root, int _depth, int _maxdepth)
+            {
+                root = _root;
+                depth = _depth;
+                maxdepth = _maxdepth;
+            }
+
+            public Node root;
+            public int depth;
+            public int maxdepth;
+        }
+
+        void Split(object data)
+        {
+            SplitData splitData = data as SplitData;
+            Split(splitData.root, splitData.depth, splitData.maxdepth);
+        }
+
+        void Split(Node root, int depth, int maxdepth)
         {
             if (depth > maxdepth - 2)
                 return;
@@ -332,7 +376,7 @@ namespace Path_Tracing
                 Split(root.right, depth + 1, maxdepth);
         }
 
-        static bool TrianglevsAABB(Triangle triangle, AABB aabb)
+        bool TrianglevsAABB(Triangle triangle, AABB aabb)
         {
             Vector3[] aabb_vertices = new Vector3[]
             {
@@ -415,7 +459,7 @@ namespace Path_Tracing
             return true;
         }
 
-        static float SAH(Node node, Vector3 split_plane_normal, Vector3 split_plane_position)
+        float SAH(Node node, Vector3 split_plane_normal, Vector3 split_plane_position)
         {
             Vector3 diagonal = node.bounding_box.max - node.bounding_box.min;
 

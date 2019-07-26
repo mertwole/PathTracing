@@ -7,12 +7,12 @@ namespace Path_Tracing
 {
     class LoadObj
     {
-        static List<Vector3> normals = new List<Vector3>();
-        static List<Vector3> vertices = new List<Vector3>();      
+        List<Vector3> normals = new List<Vector3>();
+        List<Vector3> vertices = new List<Vector3>();      
 
-        public static List<Triangle> triangles = new List<Triangle>();
+        public List<Triangle> triangles = new List<Triangle>();
 
-        public static void Load(StreamReader stream)//3Ds max format
+        public void Load(StreamReader stream)//3Ds max format
         {
             normals = new List<Vector3>();
             vertices = new List<Vector3>();
@@ -68,7 +68,9 @@ namespace Path_Tracing
                     face.MoveNext();
                     verts[0] = face.Current;
                     face.MoveNext();
+                    face.MoveNext();
                     verts[1] = face.Current;
+                    face.MoveNext();
                     face.MoveNext();
                     verts[2] = face.Current;
 
@@ -82,38 +84,17 @@ namespace Path_Tracing
                     triangles.Add(triangle);
                 }
             }
+
+            stream.Close();
         }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        static List<char> allowed_chars = new List<char>() { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '-' };
+        static List<char> allowed_chars = new List<char>() { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '-' };
 
         static IEnumerator<float> ParseStringToEnumarator(string input)
         {
             input = input + " ";
+
+            input.Replace('.', ',');
 
             List<char> curr_num = new List<char>();
 
