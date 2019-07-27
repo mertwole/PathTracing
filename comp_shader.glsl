@@ -1,5 +1,5 @@
 #version 440 core
-layout( local_size_x = 4, local_size_y = 4) in;
+layout( local_size_x = 32, local_size_y = 32) in;
 
 layout (binding = 0, rgba8) uniform image2D Texture;
 
@@ -87,13 +87,13 @@ const Sphere[] spheres =
 const Plane planes[] = 
 {
 	{normalize(vec3(0, 1, 0)), vec3(0, -3, 0), 0},//bottom
-	{normalize(vec3(0, -1, 0)), vec3(0, 3, 0), 1},//top
+	{normalize(vec3(0, -1, 0)), vec3(0, 3, 0), 3},//top
 
-	{normalize(vec3(-1, 0, 0)), vec3(3, 0, 0), 6},//right
-	{normalize(vec3(1, 0, 0)), vec3(-3, 0, 0), 6},//left
+	{normalize(vec3(-1, 0, 0)), vec3(3, 0, 0), 1},//right
+	{normalize(vec3(1, 0, 0)), vec3(-3, 0, 0), 2},//left
 
-	{normalize(vec3(0, 0, 1)), vec3(0, 0, -3), 3},//far
-	{normalize(vec3(0, 0, -1)), vec3(0, 0, 3), 3}//near
+	{normalize(vec3(0, 0, 1)), vec3(0, 0, -3), 0},//far
+	{normalize(vec3(0, 0, -1)), vec3(0, 0, 3), 0}//near
 };
 //******************triangles*******************
 layout(std430, binding = 0) buffer tr_vertices//3 vertices per triangle
@@ -171,15 +171,12 @@ struct Material
 };
 
 Material[] materials = 
-{//  color          emission		emissive reflective refractive refraction
-	{vec3(1, 0, 0), vec3(1, 0, 0),	0.01,		0.0,	0.0,		1.00},//0
-	{vec3(0, 1, 0), vec3(0, 1, 0),	0.01,		0.0,	0.0,		1.00},//1
-	{vec3(1, 1, 1), vec3(0, 0, 0),	0.0,		0.2,	0.0,		1.00},//2
-	{vec3(0.5),     vec3(0, 0, 0),	0.0,		0.0,	0.0,		1.00},//3
-	{vec3(0.5),		vec3(0, 0, 0),	0.0,		0.0,	1.0,		1.20},//4
-	{vec3(1, 1, 1), vec3(0, 0, 0),	0.0,		0.0,	0.0,		1.00},//5
-	{vec3(0, 0, 0), vec3(2, 2, 2),	1.0,		0.0,	0.0,		1.00},//6
-	{vec3(1, 1, 1), vec3(1, 1, 1),	0.5,		0.0,	0.0,		1.00},//7
+{//  color					emission				emissive	reflective	refractive	refraction
+	{vec3(1, 1, 1),			vec3(0, 0, 0),			0.0,		0.02,		0.0,		1.00},//0
+	{vec3(1, 0, 0),			vec3(1, 0, 0),			0.0,		0.0,		0.0,		1.00},//1
+	{vec3(0, 1, 0),			vec3(0, 1, 0),			0.0,		0.0,		0.0,		1.00},//2
+	{vec3(0, 0, 0),			vec3(1, 1, 1),			0.3,		0.0,		0.0,		1.00},//3
+	{vec3(0.97, 0.4, 0.08),	vec3(0.97, 0.4, 0.08),	0.6,		0.0,		0.0,		1.00},//4
 };
 //************************camera******************************
 uniform vec3 view_point;
@@ -304,21 +301,21 @@ Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle)
 	return result;
 }
 
-Raytrace_result TraceWithBox_new(Ray ray, AABB box)
+Raytrace_result TraceWithBox(Ray ray, AABB box)
 {
 	Raytrace_result result;
 
-	vec3 dirfrac = vec3(1) / ray.direction;
+	vec3 inv = vec3(1) / ray.direction;
 
-	if(EqualsZero(dirfrac.x))
-		dirfrac.x = ZERO;
-	if(EqualsZero(dirfrac.y))
-		dirfrac.y = ZERO;
-	if(EqualsZero(dirfrac.z))
-		dirfrac.z = ZERO;
+	if(EqualsZero(ray.direction.x))
+		inv.x = INFINITY;
+	if(EqualsZero(ray.direction.y))
+		inv.y = INFINITY;
+	if(EqualsZero(ray.direction.z))
+		inv.z = INFINITY;
 
-	vec3 t0 = (box._min - ray.source) * dirfrac;
-	vec3 t1 = (box._max - ray.source) * dirfrac;
+	vec3 t0 = (box._min - ray.source) * inv;
+	vec3 t1 = (box._max - ray.source) * inv;
 
 	float tmin = max(max(min(t0.x, t1.x), min(t0.y, t1.y)), min(t0.z, t1.z));
 	float tmax = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z));
@@ -331,88 +328,6 @@ Raytrace_result TraceWithBox_new(Ray ray, AABB box)
 		result.t = tmax;
 	else
 		result.intersection = false;
-
-	return result;
-}
-
-Raytrace_result TraceWithBox(Ray ray, AABB box)
-{
-	Raytrace_result result;
-	result.intersection = false;
-
-	float tmin, tmax, tymin, tymax, tzmin, tzmax;
-	
-	if(EqualsZero(ray.direction.x))
-	{
-		tmin = -INFINITY;
-		tmax = INFINITY;
-	}
-	else if (ray.direction.x > 0) 
-	{
-		tmin = (box._min.x - ray.source.x) / ray.direction.x;
-		tmax = (box._max.x - ray.source.x) / ray.direction.x;
-	}	
-	else
-	{
-		tmin = (box._max.x - ray.source.x) / ray.direction.x;
-		tmax = (box._min.x - ray.source.x) / ray.direction.x;
-	}
-
-	if(EqualsZero(ray.direction.y))
-	{
-		tymin = -INFINITY;
-		tymax = INFINITY;
-	}
-	else if (ray.direction.y > 0) {
-		tymin = (box._min.y - ray.source.y) / ray.direction.y;
-		tymax = (box._max.y - ray.source.y) / ray.direction.y;
-	}
-	else {
-		tymin = (box._max.y - ray.source.y) / ray.direction.y;
-		tymax = (box._min.y - ray.source.y) / ray.direction.y;
-	}
-
-	if ( (tmin > tymax) || (tymin > tmax) )
-		return result;
-	if (tymin > tmin)
-		tmin = tymin;
-	if (tymax < tmax)
-		tmax = tymax;
-
-	if(EqualsZero(ray.direction.z))
-	{
-		tzmin = -INFINITY;
-		tzmax = INFINITY;
-	}
-	else if (ray.direction.z > 0) 
-	{
-		tzmin = (box._min.z - ray.source.z) / ray.direction.z;
-		tzmax = (box._max.z - ray.source.z) / ray.direction.z;
-	}
-	else 
-	{
-		tzmin = (box._max.z - ray.source.z) / ray.direction.z;
-		tzmax = (box._min.z - ray.source.z) / ray.direction.z;
-	}
-	if ( (tmin > tzmax) || (tzmin > tmax) )
-		return result;
-	if (tzmin > tmin)
-		tmin = tzmin;
-	if (tzmax < tmax)
-		tmax = tzmax;
-
-	if(tmin < ray.max_value && tmin > ray.min_value)
-	{
-		result.t = tmin;
-		result.contact = ray.source + ray.direction * tmin;
-		result.intersection = true;
-	}
-	else if(tmax < ray.max_value && tmax > ray.min_value)
-	{
-		result.t = tmax;
-		result.contact = ray.source + ray.direction * tmax;
-		result.intersection = true;
-	}
 
 	return result;
 }
