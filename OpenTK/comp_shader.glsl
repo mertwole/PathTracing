@@ -78,12 +78,10 @@ uniform int planes_amount;
 //*************************spheres**************
 const Sphere[] spheres = 
 {
-	{vec3(-1.5, -2, -1), 0.75, 0},
-	{vec3(0, -3, -1), 0.75, 3},
-	{vec3(1.5, -2, -1), 0.75, 2},
-	{vec3(-1.5, 0, -1), 0.75, 4},
-	{vec3(0.7, 0.5, 0.5), 1, 1},
-	{vec3(1.5, 0, -1), 0.75, 5}
+	{vec3(-3, -3, -3), 1, 3},
+	{vec3(-3, 3, -2), 1, 3},
+	{vec3(3, -3, -3), 1, 3},
+	{vec3(0, 0, -1), 1, 3}
 };
 //***********************planes*****************
 const Plane planes[] = 
@@ -173,12 +171,12 @@ struct Material
 };
 Material[] materials = 
 {//  color					emission				emissive	reflective	refractive	refraction
-	{vec3(1, 1, 1),			vec3(1, 1, 1),			0.01,		0.0,		0.0,		1.00},//0
-	{vec3(1, 1, 1),			vec3(0, 0, 0),			0.0,		0.0,		1.0,		1.1},//1
+	{vec3(1, 1, 1),			vec3(0, 0, 0),			0.0,		0.0,		0.0,		1.00},//0
+	{vec3(1, 1, 1),			vec3(0, 0, 0),			0.0,		0.0,		1.0,		1.33},//1
 	{vec3(1, 1, 1),			vec3(0, 0, 0),			0.0,		0.5,		0.0,		1.00},//2
 	{vec3(0, 0, 0),			vec3(1, 1, 1),			1.0,		0.0,		0.0,		1.00},//3
-	{vec3(0.25, 0.5, 1),	vec3(0, 0, 0),			0.0,		0.0,		0.0,		1.00},//4
-	{vec3(1, 0.5, 0.25),	vec3(0, 0, 0),			0.0,		0.0,		0.0,		1.00},//5
+	{vec3(1, 0, 0),			vec3(0, 0, 0),			0.0,		0.0,		0.0,		1.00},//4
+	{vec3(0, 1, 0),			vec3(0, 0, 0),			0.0,		0.0,		0.0,		1.00},//5
 };
 //************************camera******************************
 uniform vec3 view_point;
@@ -399,7 +397,7 @@ Raytrace_result TraceInKdTree(Ray ray, float curr_t)
 				else if(withleft.intersection)
 					curr_node = nodes[curr_node].left;
 				else if(withright.intersection)
-					curr_node = nodes[curr_node].right;		
+					curr_node = nodes[curr_node].right;			
 			}
 			else//moving to leaf
 			{
@@ -512,8 +510,8 @@ vec3 GetColor(Ray ray)
 		// from refl to refr + refl is refraction
 		// from refl + refr to refl + refr + emissive is emission
 		// from refl + refr + emissive to 1 is diffuse
-		float rand = Rand(pixel_position);	
-
+		float rand = Rand(pixel_position);
+		
 		if(rand < material.reflective)
 		{//reflection
 			current_ray.direction = reflect(current_ray.direction, result.normal);
@@ -538,9 +536,12 @@ vec3 GetColor(Ray ray)
 		{//diffuse
 			//selecting random direction in hemisphere
 			vec3 rand_direction = normalize(vec3(Rand(pixel_position) * 2 - 1, Rand(pixel_position + vec2(1, 0)) * 2 - 1, Rand(pixel_position + vec2(0, 1)) * 2 - 1));
+
 			// flip vector that not in hemisphere
 			rand_direction *= sign(sign(dot(rand_direction, result.normal) + ZERO) + 0.5);
+
 			current_ray.direction = rand_direction;
+
 			color *= 2 * dot(current_ray.direction, result.normal) * material.color;
 		}		
 		
