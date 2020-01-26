@@ -16,21 +16,21 @@ namespace PathTracing.Load
         public static void Load(string model_path, int max_tree_depth, int material_id)
         {
             LoadObj loadObj = new LoadObj();
-            BuildKDTree buildKdTree = new BuildKDTree();
+            KDTree kd_tree = new KDTree();
 
             loadObj.Load(new StreamReader(model_path + ".obj"));
             Triangle[] triangles = loadObj.triangles.ToArray();
 
             try
             {
-                buildKdTree.LoadFromJson(new StreamReader(model_path + ".tree"));
+                kd_tree.LoadFromJson(new StreamReader(model_path + ".tree"));
                 Console.WriteLine("cached tree found");
             }
             catch
             {
                 Console.WriteLine("building tree...");
-                buildKdTree.Build(triangles, max_tree_depth);
-                buildKdTree.CacheIntoJson(new StreamWriter(model_path + ".tree"));
+                kd_tree.Build(triangles, max_tree_depth);
+                kd_tree.CacheIntoJson(new StreamWriter(model_path + ".tree"));
                 Console.WriteLine("tree built");
             }
 
@@ -60,28 +60,28 @@ namespace PathTracing.Load
                 triangle_indexes = GL.GenBuffer(),
                 aabbs = GL.GenBuffer();
 
-            GL.Uniform1(GL.GetUniformLocation(Game.compute_shader, "node_count"), buildKdTree.preparedTreeData.nodes.Count);
+            GL.Uniform1(GL.GetUniformLocation(Game.compute_shader, "node_count"), kd_tree.preparedTreeData.nodes.Count);
 
             GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 5, nodes);
             GL.BufferData(BufferTarget.ShaderStorageBuffer,
-                sizeof(int) * 4 * buildKdTree.preparedTreeData.nodes.Count, buildKdTree.preparedTreeData.nodes.ToArray(), BufferUsageHint.StaticDraw);
+                sizeof(int) * 4 * kd_tree.preparedTreeData.nodes.Count, kd_tree.preparedTreeData.nodes.ToArray(), BufferUsageHint.StaticDraw);
 
             GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 6, leaves);
             GL.BufferData(BufferTarget.ShaderStorageBuffer,
-                sizeof(int) * 4 * buildKdTree.preparedTreeData.leaves.Count, buildKdTree.preparedTreeData.leaves.ToArray(), BufferUsageHint.StaticDraw);
+                sizeof(int) * 4 * kd_tree.preparedTreeData.leaves.Count, kd_tree.preparedTreeData.leaves.ToArray(), BufferUsageHint.StaticDraw);
 
             GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 7, triangle_indexes);
             GL.BufferData(BufferTarget.ShaderStorageBuffer,
-                sizeof(int) * buildKdTree.preparedTreeData.triangle_indexes_tree.Count, buildKdTree.preparedTreeData.triangle_indexes_tree.ToArray(), BufferUsageHint.StaticDraw);
+                sizeof(int) * kd_tree.preparedTreeData.triangle_indexes_tree.Count, kd_tree.preparedTreeData.triangle_indexes_tree.ToArray(), BufferUsageHint.StaticDraw);
 
             List<Vector4> aabb_verts = new List<Vector4>();
-            foreach (var aabb in buildKdTree.preparedTreeData.aabbs)
+            foreach (var aabb in kd_tree.preparedTreeData.aabbs)
             {
                 aabb_verts.Add(new Vector4(aabb.min_x, aabb.min_y, aabb.min_z, 1));
                 aabb_verts.Add(new Vector4(aabb.max_x, aabb.max_y, aabb.max_z, 1));
             }
             GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 8, aabbs);
-            GL.BufferData(BufferTarget.ShaderStorageBuffer, sizeof(float) * 8 * buildKdTree.preparedTreeData.aabbs.Count,
+            GL.BufferData(BufferTarget.ShaderStorageBuffer, sizeof(float) * 8 * kd_tree.preparedTreeData.aabbs.Count,
                 aabb_verts.ToArray(), BufferUsageHint.StaticDraw);
         }
     }

@@ -126,7 +126,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Load\BuildKDTree.cs" />
+    <Compile Include="Load\KDTree.cs" />
     <Compile Include="CompileShaders.cs" />
     <Compile Include="Load\LoadMaterials.cs" />
     <Compile Include="Load\LoadObj.cs" />

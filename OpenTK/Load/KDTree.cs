@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace PathTracing.Load
 {
-    public class BuildKDTree
+    public class KDTree
     {
         const float ZERO = 0.000001f;
 
