@@ -92,16 +92,99 @@ namespace Path_Tracing
             GL.Uniform1(GL.GetUniformLocation(compute_shader, "view_distance"), 7.01f);
             GL.Uniform2(GL.GetUniformLocation(compute_shader, "viewport"), new Vector2(5.99f, 5.99f));
             //*************************************************
-            GL.Uniform1(GL.GetUniformLocation(compute_shader, "spheres_amount"), 6);
-            GL.Uniform1(GL.GetUniformLocation(compute_shader, "planes_amount"), 6);
+            #region spheres
+            Sphere[] spheres = new Sphere[]
+            {
+                new Sphere() {center = new Vector3(3, -3, 1), radius = 1, material = 0 },
+                new Sphere() {center = new Vector3(0, -1, 0), radius = 1, material = 4 },
+            };
 
-            LoadTrianglesToBuffers(modelPath + ".obj", 14, 2);
+            GL.Uniform1(GL.GetUniformLocation(compute_shader, "spheres_amount"), spheres.Length);
+            int spheres_buffer = GL.GenBuffer();
+            GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0, spheres_buffer);
+            GL.BufferData(BufferTarget.ShaderStorageBuffer, spheres.Length * Sphere.size, spheres, BufferUsageHint.StaticDraw);
+            #endregion
+
+            #region planes
+            Plane[] planes = new Plane[]
+            {
+                new Plane() {normal = new Vector3(0, -1, 0).Normalized(), point = new Vector3(0, 3, 0), material_id = 0},//top
+                
+                new Plane() {normal = new Vector3(0, 1, 0).Normalized(), point = new Vector3(0, -3, 0), material_id = 1},//bottom
+                
+                new Plane() {normal = new Vector3(-1, 0, 0).Normalized(), point = new Vector3(3, 0, 0), material_id = 2},//right
+                new Plane() {normal = new Vector3(1, 0, 0).Normalized(), point = new Vector3(-3, 0, 0), material_id = 3},//left
+
+                new Plane() {normal = new Vector3(0, 0, 1).Normalized(), point = new Vector3(0, 0, -3), material_id = 1},//far
+                new Plane() {normal = new Vector3(0, 0, -1).Normalized(), point = new Vector3(0, 0, 3), material_id = 1},//near
+            };
+
+            GL.Uniform1(GL.GetUniformLocation(compute_shader, "planes_amount"), planes.Length);
+            int planes_buffer = GL.GenBuffer();
+            GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1, planes_buffer);
+            GL.BufferData(BufferTarget.ShaderStorageBuffer, planes.Length * Plane.size, planes, BufferUsageHint.StaticDraw);
+            #endregion
+
+            #region materials
+            Material[] materials = new Material[]
+            {
+                new Material() {color = new Vector3(1.0f, 1.0f, 1.0f), emission = new Vector3(1, 1, 1), emmisive = 1, reflective = 0},//0
+                new Material() {color = new Vector3(1.0f, 1.0f, 1.0f), emission = new Vector3(0, 0, 0), emmisive = 0, reflective = 0},//1
+                new Material() {color = new Vector3(1.0f, 0.2f, 0.2f), emission = new Vector3(0, 0, 0), emmisive = 0, reflective = 0},//2
+                new Material() {color = new Vector3(0.2f, 0.2f, 1.0f), emission = new Vector3(0, 0, 0), emmisive = 0, reflective = 0},//3
+                new Material() {color = new Vector3(0.2f, 0.2f, 1.0f), emission = new Vector3(0, 0, 0), emmisive = 0, reflective = 1},//4
+            };
+
+            int materials_buffer = GL.GenBuffer();
+            GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 2, materials_buffer);
+            GL.BufferData(BufferTarget.ShaderStorageBuffer, materials.Length * Material.size, materials, BufferUsageHint.StaticDraw);
+            #endregion
+
+            //LoadTrianglesToBuffers(modelPath + ".obj", 14, 2);
             GC.Collect(); // buildKdTree and LoadObj
         }
 
         public struct Triangle
         {
             public Vector3[] vertices;
+        }
+
+        struct Sphere
+        {
+            public Vector3 center;
+            public float radius;
+            public int material;
+
+            public float pad0;
+            public float pad1;
+            public float pad2;
+
+            public static int size = 8 * sizeof(float);
+        }
+
+        struct Plane
+        {
+            public Vector3 normal;
+            public float pad_0;
+            public Vector3 point;
+            public int material_id;
+
+            public static int size = 8 * sizeof(float);
+        }
+
+        struct Material
+        {
+            public Vector3 color;
+            public float reflective;
+            public Vector3 emission;
+            public float emmisive;
+            public float refractive;
+            public float refraction;
+
+            public float pad0;
+            public float pad1;
+
+            public static int size = 12 * sizeof(float);
         }
 
         static string modelPath = "stanford-dragon";

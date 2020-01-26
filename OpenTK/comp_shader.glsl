@@ -72,28 +72,19 @@ Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle);
 //************primitives**************************************
 
 uniform int triangles_amount;
+
+//*************************spheres**************
 uniform int spheres_amount;
 uniform int planes_amount;
 
-//*************************spheres**************
-const Sphere[] spheres = 
+layout(std430, binding = 0) buffer SPHERES
 {
-	{vec3(-3, -3, -3), 1, 3},
-	{vec3(-3, 3, -2), 1, 3},
-	{vec3(3, -3, -3), 1, 3},
-	{vec3(0, 0, -1), 1, 3}
+	Sphere spheres[];
 };
-//***********************planes*****************
-const Plane planes[] = 
+
+layout(std430, binding = 1) buffer PLANES
 {
-	{normalize(vec3(0, 1, 0)), vec3(0, -3, 0), 0},//bottom
-	{normalize(vec3(0, -1, 0)), vec3(0, 3, 0), 3},//top
-
-	{normalize(vec3(-1, 0, 0)), vec3(3, 0, 0), 4},//right
-	{normalize(vec3(1, 0, 0)), vec3(-3, 0, 0), 5},//left
-
-	{normalize(vec3(0, 0, 1)), vec3(0, 0, -3), 0},//far
-	{normalize(vec3(0, 0, -1)), vec3(0, 0, 3), 0}//near
+	Plane planes[];
 };
 //******************triangles*******************
 layout(std430, binding = 0) buffer tr_vertices//3 vertices per triangle
@@ -162,21 +153,17 @@ AABB getAABBbyIndex(int index)
 struct Material
 {
 	vec3 color;
+	float reflective;
 	vec3 emission;
 	float emissive;
-	float reflective;
 
 	float refractive;
 	float refraction;
 };
-Material[] materials = 
-{//  color					emission				emissive	reflective	refractive	refraction
-	{vec3(1, 1, 1),			vec3(0, 0, 0),			0.0,		0.0,		0.0,		1.00},//0
-	{vec3(1, 1, 1),			vec3(0, 0, 0),			0.0,		0.0,		1.0,		1.33},//1
-	{vec3(1, 1, 1),			vec3(0, 0, 0),			0.0,		0.5,		0.0,		1.00},//2
-	{vec3(0, 0, 0),			vec3(1, 1, 1),			1.0,		0.0,		0.0,		1.00},//3
-	{vec3(1, 0, 0),			vec3(0, 0, 0),			0.0,		0.0,		0.0,		1.00},//4
-	{vec3(0, 1, 0),			vec3(0, 0, 0),			0.0,		0.0,		0.0,		1.00},//5
+
+layout(std430, binding = 2) buffer MATERIALS
+{
+	Material materials[];
 };
 //************************camera******************************
 uniform vec3 view_point;
