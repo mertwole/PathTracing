@@ -17,15 +17,15 @@ namespace Path_Tracing
         static void Main()
         {
             Game game = new Game();
-            game.Run(120);
+            game.Run(60);
         }
 
-        static int window_width = 512;
-        static int window_height = 512;
-        static int image_width = 512;
-        static int image_height = 512;
+        static int window_width = 512 * 2;
+        static int window_height = 512 * 2;
+        static int image_width = 512 * 2; 
+        static int image_height = 512 * 2;
         static int workgroup_size = 32;//max 32
-        public Game() : base(window_width, window_height, new GraphicsMode(new ColorFormat(8, 8, 8, 0), 24, 8, 1/*msaa*/, new ColorFormat(8, 8, 8, 0), 2), "PathTracing")
+        public Game() : base(window_width, window_height, new GraphicsMode(new ColorFormat(8, 8, 8, 0), 24, 8, 4/*msaa*/, new ColorFormat(8, 8, 8, 0), 2), "PathTracing")
         {
             VSync = VSyncMode.On;
         }
@@ -92,10 +92,10 @@ namespace Path_Tracing
             GL.Uniform1(GL.GetUniformLocation(compute_shader, "view_distance"), 7.01f);
             GL.Uniform2(GL.GetUniformLocation(compute_shader, "viewport"), new Vector2(5.99f, 5.99f));
             //*************************************************
-            GL.Uniform1(GL.GetUniformLocation(compute_shader, "spheres_amount"), 0);
+            GL.Uniform1(GL.GetUniformLocation(compute_shader, "spheres_amount"), 6);
             GL.Uniform1(GL.GetUniformLocation(compute_shader, "planes_amount"), 6);
 
-            LoadTrianglesToBuffers(modelPath + ".obj", 14, 4);
+            LoadTrianglesToBuffers(modelPath + ".obj", 14, 2);
             GC.Collect(); // buildKdTree and LoadObj
         }
 

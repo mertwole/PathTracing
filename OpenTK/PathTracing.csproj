@@ -49,10 +49,6 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include=".gitattributes" />
-    <Content Include=".gitignore" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include=".git\config" />
     <None Include=".git\description" />
     <None Include=".git\HEAD" />

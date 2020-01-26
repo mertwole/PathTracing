@@ -67,7 +67,7 @@ Raytrace_result TraceWithSphere(Ray ray, Sphere sphere);
 Raytrace_result TraceWithPlane(Ray ray, Plane plane);
 Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle);
 
-#define REFLECTIONS 4
+#define REFLECTIONS 8
 
 //************primitives**************************************
 
@@ -78,10 +78,12 @@ uniform int planes_amount;
 //*************************spheres**************
 const Sphere[] spheres = 
 {
-	{vec3(0, 3, 0), 1, 2},
-	{vec3(0, -2, 0), 1, 2},
-	{vec3(-2, -2.5, 0), 0.5, 3},
-	{vec3(2, -2.5, 0), 0.5, 3}
+	{vec3(-1.5, -2, -1), 0.75, 0},
+	{vec3(0, -3, -1), 0.75, 3},
+	{vec3(1.5, -2, -1), 0.75, 2},
+	{vec3(-1.5, 0, -1), 0.75, 4},
+	{vec3(0.7, 0.5, 0.5), 1, 1},
+	{vec3(1.5, 0, -1), 0.75, 5}
 };
 //***********************planes*****************
 const Plane planes[] = 
@@ -89,8 +91,8 @@ const Plane planes[] =
 	{normalize(vec3(0, 1, 0)), vec3(0, -3, 0), 0},//bottom
 	{normalize(vec3(0, -1, 0)), vec3(0, 3, 0), 3},//top
 
-	{normalize(vec3(-1, 0, 0)), vec3(3, 0, 0), 1},//right
-	{normalize(vec3(1, 0, 0)), vec3(-3, 0, 0), 2},//left
+	{normalize(vec3(-1, 0, 0)), vec3(3, 0, 0), 4},//right
+	{normalize(vec3(1, 0, 0)), vec3(-3, 0, 0), 5},//left
 
 	{normalize(vec3(0, 0, 1)), vec3(0, 0, -3), 0},//far
 	{normalize(vec3(0, 0, -1)), vec3(0, 0, 3), 0}//near
@@ -169,14 +171,14 @@ struct Material
 	float refractive;
 	float refraction;
 };
-
 Material[] materials = 
 {//  color					emission				emissive	reflective	refractive	refraction
-	{vec3(1, 1, 1),			vec3(0, 0, 0),			0.0,		0.02,		0.0,		1.00},//0
-	{vec3(1, 0, 0),			vec3(1, 0, 0),			0.0,		0.0,		0.0,		1.00},//1
-	{vec3(0, 1, 0),			vec3(0, 1, 0),			0.0,		0.0,		0.0,		1.00},//2
-	{vec3(0, 0, 0),			vec3(1, 1, 1),			0.3,		0.0,		0.0,		1.00},//3
-	{vec3(0.97, 0.4, 0.08),	vec3(0.97, 0.4, 0.08),	0.6,		0.0,		0.0,		1.00},//4
+	{vec3(1, 1, 1),			vec3(1, 1, 1),			0.01,		0.0,		0.0,		1.00},//0
+	{vec3(1, 1, 1),			vec3(0, 0, 0),			0.0,		0.0,		1.0,		1.1},//1
+	{vec3(1, 1, 1),			vec3(0, 0, 0),			0.0,		0.5,		0.0,		1.00},//2
+	{vec3(0, 0, 0),			vec3(1, 1, 1),			1.0,		0.0,		0.0,		1.00},//3
+	{vec3(0.25, 0.5, 1),	vec3(0, 0, 0),			0.0,		0.0,		0.0,		1.00},//4
+	{vec3(1, 0.5, 0.25),	vec3(0, 0, 0),			0.0,		0.0,		0.0,		1.00},//5
 };
 //************************camera******************************
 uniform vec3 view_point;
@@ -382,6 +384,8 @@ Raytrace_result TraceInKdTree(Ray ray, float curr_t)
 	{
 		if(curr_node > prev_node)//moving down
 		{
+			prev_node = curr_node;
+
 			CheckedStackTop++;
 			CheckedStack[CheckedStackTop] = false;
 
@@ -391,39 +395,19 @@ Raytrace_result TraceInKdTree(Ray ray, float curr_t)
 				Raytrace_result withright = TraceWithBox(ray, getAABBbyIndex(nodes[curr_node].right));
 
 				if(withleft.intersection && withright.intersection)
-				{
-					if(withleft.t < withright.t)
-					{//left first
-						prev_node = curr_node;
-						curr_node = nodes[curr_node].left;
-					}
-					else
-					{//right first
-						prev_node = curr_node;
-						curr_node = nodes[curr_node].right;
-					}
-				}
+					curr_node = (withleft.t < withright.t) ? nodes[curr_node].left : nodes[curr_node].right;
 				else if(withleft.intersection)
-				{
-					prev_node = curr_node;
 					curr_node = nodes[curr_node].left;
-				}
 				else if(withright.intersection)
-				{
-					prev_node = curr_node;
-					curr_node = nodes[curr_node].right;
-				}			
+					curr_node = nodes[curr_node].right;		
 			}
 			else//moving to leaf
 			{
 				Raytrace_result leaf_result = TraceInTreeLeaf(ray, curr_node, curr_t);
 
 				if(leaf_result.intersection)
-				{
 					return leaf_result;
-				}
 
-				prev_node = curr_node;
 				curr_node = leaves[curr_node - node_count].parent;
 			}
 		}
@@ -450,29 +434,13 @@ Raytrace_result TraceInKdTree(Ray ray, float curr_t)
 
 			if(nodes[curr_node].left == prev_node)//lifting from left
 			{
-				if(TraceWithBox(ray, getAABBbyIndex(nodes[curr_node].right)).intersection)
-				{
-					prev_node = curr_node;
-					curr_node = nodes[curr_node].right;
-				}
-				else
-				{
-					prev_node = curr_node;
-					curr_node = nodes[curr_node].parent;
-				}
+				prev_node = curr_node;
+				curr_node = TraceWithBox(ray, getAABBbyIndex(nodes[curr_node].right)).intersection ? nodes[curr_node].right : nodes[curr_node].parent;
 			}
 			else//lifting from right
 			{
-				if(TraceWithBox(ray, getAABBbyIndex(nodes[curr_node].left)).intersection)
-				{
-					prev_node = curr_node;
-					curr_node = nodes[curr_node].left;
-				}
-				else
-				{
-					prev_node = curr_node;
-					curr_node = nodes[curr_node].parent;
-				}
+				prev_node = curr_node;
+				curr_node = TraceWithBox(ray, getAABBbyIndex(nodes[curr_node].left)).intersection ? nodes[curr_node].left : nodes[curr_node].parent;
 			}
 		}
 
@@ -484,7 +452,6 @@ Raytrace_result TraceRay(Ray ray)
 	Raytrace_result result;
 	result.t = INFINITY;
 	result.intersection = false;
-
 	
 	for(int i = 0; i < spheres_amount; i++)//find sphere with min t
 	{
@@ -497,7 +464,6 @@ Raytrace_result TraceRay(Ray ray)
 		}
 	}
 	
-
 	
 	for(int i = 0; i < planes_amount; i++)//find plane with min t
 	{
@@ -518,7 +484,6 @@ Raytrace_result TraceRay(Ray ray)
 			result = res;
 	}
 	
-
 	return result;
 }
 
@@ -547,8 +512,8 @@ vec3 GetColor(Ray ray)
 		// from refl to refr + refl is refraction
 		// from refl + refr to refl + refr + emissive is emission
 		// from refl + refr + emissive to 1 is diffuse
-		float rand = Rand(pixel_position);
-		
+		float rand = Rand(pixel_position);	
+
 		if(rand < material.reflective)
 		{//reflection
 			current_ray.direction = reflect(current_ray.direction, result.normal);
@@ -573,12 +538,9 @@ vec3 GetColor(Ray ray)
 		{//diffuse
 			//selecting random direction in hemisphere
 			vec3 rand_direction = normalize(vec3(Rand(pixel_position) * 2 - 1, Rand(pixel_position + vec2(1, 0)) * 2 - 1, Rand(pixel_position + vec2(0, 1)) * 2 - 1));
-
 			// flip vector that not in hemisphere
 			rand_direction *= sign(sign(dot(rand_direction, result.normal) + ZERO) + 0.5);
-
 			current_ray.direction = rand_direction;
-
 			color *= 2 * dot(current_ray.direction, result.normal) * material.color;
 		}		
 		
