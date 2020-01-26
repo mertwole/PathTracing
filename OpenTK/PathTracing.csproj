@@ -141,6 +141,11 @@
     <Folder Include=".git\objects\pack\" />
     <Folder Include=".git\refs\tags\" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="data\materials.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSHARP.Targets" />
   <ProjectExtensions>
     <VisualStudio AllowExistingFolder="true" />

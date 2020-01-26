@@ -96,8 +96,8 @@ namespace PathTracing
 
             LoadPlanes.Load();
             LoadSpheres.Load();
-            LoadMaterials.Load();
-            LoadModel.Load("stanford-dragon", 18, 1);
+            new LoadMaterials().Load(@"data\materials.xml");
+            LoadModel.Load(@"data\stanford-dragon", 18, 1);
         }     
 
         int iterations = 1;
