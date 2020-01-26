@@ -1,9 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using OpenTK;
-using static Path_Tracing.Game;
 
-namespace Path_Tracing
+namespace PathTracing.Load
 {
     class LoadObj
     {

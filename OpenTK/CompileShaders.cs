@@ -2,7 +2,7 @@
 using System;
 using System.IO;
 
-namespace Path_Tracing
+namespace PathTracing
 {
     class CompileShaders
     {

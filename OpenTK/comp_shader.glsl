@@ -67,7 +67,7 @@ Raytrace_result TraceWithSphere(Ray ray, Sphere sphere);
 Raytrace_result TraceWithPlane(Ray ray, Plane plane);
 Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle);
 
-#define REFLECTIONS 8
+#define REFLECTIONS 4
 
 //************primitives**************************************
 
@@ -86,13 +86,30 @@ layout(std430, binding = 1) buffer PLANES
 {
 	Plane planes[];
 };
+//******************materials*********************************
+
+struct Material
+{
+	vec3 color;
+	float reflective;
+	vec3 emission;
+	float emissive;
+
+	float refractive;
+	float refraction;
+};
+
+layout(std430, binding = 2) buffer MATERIALS
+{
+	Material materials[];
+};
 //******************triangles*******************
-layout(std430, binding = 0) buffer tr_vertices//3 vertices per triangle
+layout(std430, binding = 3) buffer tr_vertices//3 vertices per triangle
 {
 	vec4 triangle_vertices[];
 };
 
-layout(std430, binding = 1) buffer tr_materials
+layout(std430, binding = 4) buffer tr_materials
 {
 	int triangle_materials[];
 };
@@ -124,22 +141,22 @@ struct kDtree_leaf
 
 uniform int node_count;
 
-layout(std430, binding = 2) buffer _nodes
+layout(std430, binding = 5) buffer _nodes
 {
 	kDtree_node[] nodes;
 };
 
-layout(std430, binding = 3) buffer _leaves
+layout(std430, binding = 6) buffer _leaves
 {
 	kDtree_leaf[] leaves;
 };
 
-layout(std430, binding = 4) buffer _triangle_indexes_kDtree
+layout(std430, binding = 7) buffer _triangle_indexes_kDtree
 {
 	int[] triangle_indexes_kDtree;
 };
 
-layout(std430, binding = 5) buffer _aabbs
+layout(std430, binding = 8) buffer _aabbs
 {
 	vec4[] aabbs;//by index
 };
@@ -148,23 +165,7 @@ AABB getAABBbyIndex(int index)
 {
 	return AABB(aabbs[index * 2].xyz, aabbs[index * 2 + 1].xyz);
 }
-//******************materials*********************************
 
-struct Material
-{
-	vec3 color;
-	float reflective;
-	vec3 emission;
-	float emissive;
-
-	float refractive;
-	float refraction;
-};
-
-layout(std430, binding = 2) buffer MATERIALS
-{
-	Material materials[];
-};
 //************************camera******************************
 uniform vec3 view_point;
 uniform float view_distance;

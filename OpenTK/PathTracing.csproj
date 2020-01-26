@@ -126,9 +126,13 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BuildKDTree.cs" />
+    <Compile Include="Load\BuildKDTree.cs" />
     <Compile Include="CompileShaders.cs" />
-    <Compile Include="LoadObj.cs" />
+    <Compile Include="Load\LoadMaterials.cs" />
+    <Compile Include="Load\LoadObj.cs" />
+    <Compile Include="Load\LoadPlanes.cs" />
+    <Compile Include="Load\LoadSpheres.cs" />
+    <Compile Include="Load\LoadModel.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

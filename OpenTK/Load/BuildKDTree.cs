@@ -1,13 +1,12 @@
 ﻿using System.Collections.Generic;
 using OpenTK;
-using static Path_Tracing.Game;
 using Newtonsoft.Json;
 using System.IO;
 using System.Threading;
 
-namespace Path_Tracing
+namespace PathTracing.Load
 {
-    class BuildKDTree
+    public class BuildKDTree
     {
         const float ZERO = 0.000001f;
 
