@@ -71,8 +71,10 @@ namespace PathTracing
             GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
             #endregion
 
+            #region shaders
             render_shader = CompileShaders.Compile(new StreamReader("frag_shader.glsl"), new StreamReader("vert_shader.glsl"));
             compute_shader = CompileShaders.CompileComputeShader(new StreamReader("comp_shader.glsl"));
+            #endregion
 
             GL.UseProgram(compute_shader);
 
@@ -94,10 +96,10 @@ namespace PathTracing
             GL.Uniform2(GL.GetUniformLocation(compute_shader, "viewport"), new Vector2(5.99f, 5.99f));
             #endregion
 
-            LoadPlanes.Load();
-            LoadSpheres.Load();
+            new LoadPlanes().Load(@"data\planes.xml");
+            new LoadSpheres().Load(@"data\spheres.xml");
             new LoadMaterials().Load(@"data\materials.xml");
-            LoadModel.Load(@"data\stanford-dragon", 18, 1);
+            //LoadModel.Load(@"data\stanford-dragon", 32, 4);
         }     
 
         int iterations = 1;
@@ -139,7 +141,7 @@ namespace PathTracing
 
         protected override void OnRenderFrame(FrameEventArgs E)
         {
-            for(int i = 0; i < 10; i++)
+            for(int i = 0; i < 2; i++)
             TracePath_Single();
 
             GL.BindVertexArray(VAO);

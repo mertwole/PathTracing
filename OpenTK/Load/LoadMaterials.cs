@@ -42,35 +42,16 @@ namespace PathTracing.Load
             {
                 var new_material = new Material();
 
-                new_material.color = ParseVector3(material_node, "color");
-                new_material.emission = ParseVector3(material_node, "emmision");
+                new_material.color = CommonParse.ParseVector3(material_node, "color");
+                new_material.emission = CommonParse.ParseVector3(material_node, "emmision");
 
-                new_material.emmisive = ParseFloat(material_node, "emmisive");
-                new_material.reflective = ParseFloat(material_node, "reflective");
-                new_material.refractive = ParseFloat(material_node, "refractive");
-                new_material.refraction = ParseFloat(material_node, "refraction");
+                new_material.emmisive = CommonParse.ParseFloat(material_node, "emmisive");
+                new_material.reflective = CommonParse.ParseFloat(material_node, "reflective");
+                new_material.refractive = CommonParse.ParseFloat(material_node, "refractive");
+                new_material.refraction = CommonParse.ParseFloat(material_node, "refraction");
 
                 materials.Add(new_material);
             }
-        }
-
-        float ParseFloat(XmlNode node, string param_name)
-        {
-            float.TryParse(node.Attributes.GetNamedItem(param_name).InnerXml, out float output);
-            return output;
-        }
-
-        Vector3 ParseVector3(XmlNode node, string param_name)
-        {
-            string attrib = node.Attributes.GetNamedItem(param_name).InnerXml;
-
-            string[] coords = attrib.Split(' ');
-            Vector3 vec = new Vector3();
-            float.TryParse(coords[0], out vec.X);
-            float.TryParse(coords[1], out vec.Y);
-            float.TryParse(coords[2], out vec.Z);
-
-            return vec;
         }
     }
 }

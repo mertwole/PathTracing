@@ -126,6 +126,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Load\CommonParse.cs" />
     <Compile Include="Load\KDTree.cs" />
     <Compile Include="CompileShaders.cs" />
     <Compile Include="Load\LoadMaterials.cs" />
@@ -140,11 +141,6 @@
     <Folder Include=".git\objects\info\" />
     <Folder Include=".git\objects\pack\" />
     <Folder Include=".git\refs\tags\" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="data\materials.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSHARP.Targets" />
   <ProjectExtensions>

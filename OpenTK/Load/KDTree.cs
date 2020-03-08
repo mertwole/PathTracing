@@ -72,7 +72,7 @@ namespace PathTracing.Load
             for(int i = 0; i < triangles.Length; i++)
                 root.triangle_indices.Add(i);
 
-            try // use multithreading
+            if(depth > 3)
             {
                 Split(root, 0, 3);
 
@@ -91,7 +91,7 @@ namespace PathTracing.Load
                 subroot_2.Join();
                 subroot_3.Join();
             }
-            catch // tree depth <= 3 , cannot use multithreading
+            else // tree depth <= 3 , cannot use multithreading
             {
                 Split(root, 0, depth);
             }
@@ -275,6 +275,7 @@ namespace PathTracing.Load
         }
         #endregion
 
+        #region JSON
         public void CacheIntoJson(StreamWriter writer)
         {
             string serialized = JsonConvert.SerializeObject(preparedTreeData);
@@ -287,7 +288,9 @@ namespace PathTracing.Load
             preparedTreeData = JsonConvert.DeserializeObject<PreparedTreeData>(reader.ReadToEnd());
             reader.Close();
         }
+        #endregion
 
+        #region split
         class SplitData
         {
             public SplitData(Node _root, int _depth, int _maxdepth)
@@ -505,5 +508,6 @@ namespace PathTracing.Load
 
             return left_half_surface * left_triangles + right_half_surface * right_triangles;
         }
+        #endregion
     }
 }

@@ -1,9 +1,11 @@
 ﻿using OpenTK;
 using OpenTK.Graphics.OpenGL4;
+using System.Collections.Generic;
+using System.Xml;
 
 namespace PathTracing.Load
 {
-    public static class LoadPlanes
+    public class LoadPlanes
     {
         struct Plane
         {
@@ -15,25 +17,34 @@ namespace PathTracing.Load
             public static int size = 8 * sizeof(float);
         }
 
-        public static void Load()
+        List<Plane> planes = new List<Plane>();
+
+        public void Load(string xml_path)
         {
-            Plane[] planes = new Plane[]
-            {
-                new Plane() {normal = new Vector3(0, -1, 0).Normalized(), point = new Vector3(0, 3, 0), material_id = 0},//top
-                
-                new Plane() {normal = new Vector3(0, 1, 0).Normalized(), point = new Vector3(0, -3, 0), material_id = 1},//bottom
-                
-                new Plane() {normal = new Vector3(-1, 0, 0).Normalized(), point = new Vector3(3, 0, 0), material_id = 2},//right
-                new Plane() {normal = new Vector3(1, 0, 0).Normalized(), point = new Vector3(-3, 0, 0), material_id = 3},//left
+            XmlDocument xml = new XmlDocument();
+            xml.Load(xml_path);
+            ParseXML(xml.DocumentElement);
 
-                new Plane() {normal = new Vector3(0, 0, 1).Normalized(), point = new Vector3(0, 0, -3), material_id = 1},//far
-                new Plane() {normal = new Vector3(0, 0, -1).Normalized(), point = new Vector3(0, 0, 3), material_id = 1},//near
-            };
-
-            GL.Uniform1(GL.GetUniformLocation(Game.compute_shader, "planes_amount"), planes.Length);
+            GL.Uniform1(GL.GetUniformLocation(Game.compute_shader, "planes_amount"), planes.Count);
             int planes_buffer = GL.GenBuffer();
             GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 1, planes_buffer);
-            GL.BufferData(BufferTarget.ShaderStorageBuffer, planes.Length * Plane.size, planes, BufferUsageHint.StaticDraw);
+            GL.BufferData(BufferTarget.ShaderStorageBuffer, planes.Count * Plane.size, planes.ToArray(), BufferUsageHint.StaticDraw);
+        }
+
+        void ParseXML(XmlElement xml)
+        {
+            XmlNodeList plane_nodes = xml.ChildNodes;
+            foreach (XmlNode plane_node in plane_nodes)
+            {
+                var new_plane = new Plane();
+
+                new_plane.normal = CommonParse.ParseVector3(plane_node, "normal");
+                new_plane.point = CommonParse.ParseVector3(plane_node, "point");
+
+                new_plane.material_id = CommonParse.ParseInt(plane_node, "material");
+
+                planes.Add(new_plane);
+            }
         }
     }
 }

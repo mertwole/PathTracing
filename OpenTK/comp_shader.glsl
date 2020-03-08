@@ -67,7 +67,7 @@ Raytrace_result TraceWithSphere(Ray ray, Sphere sphere);
 Raytrace_result TraceWithPlane(Ray ray, Plane plane);
 Raytrace_result TraceWithTriangle(Ray ray, Triangle triangle);
 
-#define REFLECTIONS 4
+#define REFLECTIONS 16
 
 //************primitives**************************************
 
@@ -522,15 +522,22 @@ vec3 GetColor(Ray ray)
 		}
 		else	
 		{//diffuse
-			//selecting random direction in hemisphere
-			vec3 rand_direction = normalize(vec3(Rand(pixel_position) * 2 - 1, Rand(pixel_position + vec2(1, 0)) * 2 - 1, Rand(pixel_position + vec2(0, 1)) * 2 - 1));
+			//choosing random direction in hemisphere
+			vec3 rand_direction = normalize(vec3(Rand(pixel_position), Rand((vec2(0.1, 1000) + pixel_position.yx) * 2), Rand(pixel_position + vec2(0.1, 0.9))) * 2 - vec3(1));
 
-			// flip vector that not in hemisphere
-			rand_direction *= sign(sign(dot(rand_direction, result.normal) + ZERO) + 0.5);
+			float a = Rand(pixel_position);
+			for(int i = 0; i < 10; i++)
+			{
+				if(dot(rand_direction, result.normal) < 0)//if not lies in hemisphere
+				{
+					rand_direction = normalize(vec3(Rand(pixel_position * a), Rand((vec2(0.1, 1000) + pixel_position.yx) * a * 2), Rand(pixel_position + vec2(a, 0.9))) * 2 - vec3(1));
+					a += 1;
+				}
+			}
 
 			current_ray.direction = rand_direction;
 
-			color *= 2 * dot(current_ray.direction, result.normal) * material.color;
+			color *= material.color;
 		}		
 		
 	}

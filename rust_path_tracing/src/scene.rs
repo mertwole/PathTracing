@@ -1,62 +1,101 @@
-use crate::primitives::*;
 use crate::camera::*;
-use crate::ray::{RayTraceResult, Ray};
 use crate::math::*;
-use crate::camera::{IMAGE_WIDTH, IMAGE_HEIGHT};
+use crate::primitives::*;
+use crate::ray::{Ray, RayTraceResult};
 
-pub struct Scene{
-    pub camera : Camera,
+extern crate image;
 
-    pub image : [[Vec3; IMAGE_WIDTH]; IMAGE_HEIGHT],
-    iteration : u32,
-
-    pub spheres : Vec<Sphere>,
-    pub planes : Vec<Plane>
+struct ImageBuffer{
+    pixels : Vec<Vec3>,
+    width : usize,
+    height : usize
 }
 
-impl Scene{
-    pub fn new(camera : Camera) -> Scene{
-        Scene{camera, image : [[Vec3::zero(); IMAGE_WIDTH]; IMAGE_HEIGHT], iteration : 0u32, spheres : Vec::new(), planes : Vec::new()}
+impl ImageBuffer{
+    fn new(w : usize, h : usize) -> ImageBuffer{
+        let mut img_buf = ImageBuffer{ width : w, height : h, pixels : Vec::with_capacity(w * h) };
+        for _i in 0..w*h{
+            img_buf.pixels.push(Vec3::zero());
+        }
+        img_buf
     }
 
-    fn TraceRay(&self, ray : &Ray) -> RayTraceResult{
-        let mut result = RayTraceResult::void();
-        result.t = 100000000f32; 
-        
-        for sphere in &self.spheres {
-            let sphere_result = sphere.TraceRay(&ray);
-            if result.hit && sphere_result.t < result.t{
-                result = sphere_result;
-            }    
+    fn get_pixel_mut(&mut self, x : usize, y : usize) -> &mut Vec3{
+        &mut self.pixels[x + y * self.width]
+    }
+
+    fn save_to_file(&self, path : &std::path::Path) {
+        let mut buffer : Vec<u8> = Vec::with_capacity(self.width * self.height * 3);
+        for pixel in &self.pixels{
+            buffer.push((pixel.x * 255f32) as u8);
+            buffer.push((pixel.y * 255f32) as u8);
+            buffer.push((pixel.z * 255f32) as u8);
         }
 
-        for plane in &self.planes{
-            let plane_result = plane.TraceRay(&ray);
-            if result.hit && plane_result.t < result.t{
-                result = plane_result;
+        image::save_buffer_with_format(path, &buffer, self.width as u32, self.height as u32, image::ColorType::Rgb8 , image::ImageFormat::Bmp).unwrap();
+    }
+}
+
+pub struct Scene {
+    camera: Camera,
+
+    image: ImageBuffer,
+    iteration: u32,
+
+    primitives: Vec<Box<dyn Raytraceable>>,
+}
+
+impl Scene {
+    pub fn new(camera: Camera) -> Scene {
+        Scene {
+            image: ImageBuffer::new(camera.width, camera.height),
+            camera,         
+            iteration: 0u32,
+            primitives: Vec::new(),
+        }
+    }
+
+    pub fn add_primitive(&mut self, primitive: Box<dyn Raytraceable>) {
+        self.primitives.push(primitive);
+    }
+
+    fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
+        let mut result = RayTraceResult::void();
+        result.t = std::f32::MAX;
+
+        for primitive in &self.primitives {
+            let primitive_result = primitive.trace_ray(&ray);
+            if primitive_result.hit && primitive_result.t < result.t {
+                result = primitive_result;
             }
         }
 
         result
     }
 
-    fn GetColor(&self, ray : Ray) -> Vec3{
-        let color = Vec3::zero();
+    fn get_color(&self, ray: Ray) -> Vec3 {
+        let color = Vec3::new(0.1, 0.2, 0.4);
+
+        // TODO : ray bounces
 
         color
     }
 
-    pub fn Iteration(&mut self){
+    pub fn iteration(&mut self) {
         self.iteration += 1;
 
-        for x in 0..IMAGE_WIDTH - 1{
-            for y in 0..IMAGE_HEIGHT - 1{
-                let color = self.GetColor(self.camera.get_ray_by_norm_screen_coords(Vec2::new(0.0, 0.0)));
-                let old_color = self.image[y][x];
-                let mut new_color = &(&old_color * self.iteration as f32) + &color;
+        for x in 0..self.camera.width {
+            for y in 0..self.camera.height {
+                let color = self.get_color(self.camera.get_ray(x, y));
+                let pixel = self.image.get_pixel_mut(x, y);
+                let mut new_color = &(&*pixel * self.iteration as f32) + &color;
                 new_color = &new_color / (self.iteration as f32 + 1f32);
-                self.image[y][x] = new_color;
+                *pixel = new_color;
             }
         }
+    }
+
+    pub fn save_output(&self, path: &std::path::Path) {
+        self.image.save_to_file(path);
     }
 }

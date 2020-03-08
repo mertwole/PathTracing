@@ -4,6 +4,6 @@ pub use sphere::*;
 pub mod plane;
 pub use plane::*;
 
-pub trait Raytraceable{
-    fn TraceRay(&self, ray : &Ray) -> RayTraceResult;
+pub trait Raytraceable {
+    fn trace_ray(&self, ray: &Ray) -> RayTraceResult;
 }

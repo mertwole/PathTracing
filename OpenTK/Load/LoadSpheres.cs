@@ -1,9 +1,11 @@
 ﻿using OpenTK;
 using OpenTK.Graphics.OpenGL4;
+using System.Collections.Generic;
+using System.Xml;
 
 namespace PathTracing.Load
 {
-    public static class LoadSpheres
+    public class LoadSpheres
     {
         struct Sphere
         {
@@ -18,18 +20,34 @@ namespace PathTracing.Load
             public static int size = 8 * sizeof(float);
         }
 
-        public static void Load()
-        {
-            Sphere[] spheres = new Sphere[]
-            {
-                new Sphere() {center = new Vector3(3, -3, 1), radius = 1, material = 0 },
-                new Sphere() {center = new Vector3(0, -1, 0), radius = 1, material = 4 },
-            };
+        List<Sphere> spheres = new List<Sphere>();
 
-            GL.Uniform1(GL.GetUniformLocation(Game.compute_shader, "spheres_amount"), spheres.Length);
+        public void Load(string xml_path)
+        {
+            XmlDocument xml = new XmlDocument();
+            xml.Load(xml_path);
+            ParseXML(xml.DocumentElement);
+
+            GL.Uniform1(GL.GetUniformLocation(Game.compute_shader, "spheres_amount"), spheres.Count);
             int spheres_buffer = GL.GenBuffer();
             GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0, spheres_buffer);
-            GL.BufferData(BufferTarget.ShaderStorageBuffer, spheres.Length * Sphere.size, spheres, BufferUsageHint.StaticDraw);
+            GL.BufferData(BufferTarget.ShaderStorageBuffer, spheres.Count * Sphere.size, spheres.ToArray(), BufferUsageHint.StaticDraw);
+        }
+
+        void ParseXML(XmlElement xml)
+        {
+            XmlNodeList sphere_nodes = xml.ChildNodes;
+            foreach (XmlNode sphere_node in sphere_nodes)
+            {
+                var new_sphere = new Sphere();
+
+                new_sphere.center = CommonParse.ParseVector3(sphere_node, "center");
+                new_sphere.radius = CommonParse.ParseFloat(sphere_node, "radius");
+
+                new_sphere.material = CommonParse.ParseInt(sphere_node, "material");
+
+                spheres.Add(new_sphere);
+            }
         }
     }
 }
