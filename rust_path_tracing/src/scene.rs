@@ -73,10 +73,10 @@ impl Scene {
         result
     }
 
-    fn get_color(&self, ray: Ray) -> Vec3 {
+    fn get_color(&self, ray: &Ray) -> Vec3 {
         let color = Vec3::new(0.1, 0.2, 0.4);
 
-        // TODO : ray bounces
+        // TODO : actually compute color
 
         color
     }
@@ -86,7 +86,7 @@ impl Scene {
 
         for x in 0..self.camera.width {
             for y in 0..self.camera.height {
-                let color = self.get_color(self.camera.get_ray(x, y));
+                let color = self.get_color(&self.camera.get_ray(x, y));
                 let pixel = self.image.get_pixel_mut(x, y);
                 let mut new_color = &(&*pixel * self.iteration as f32) + &color;
                 new_color = &new_color / (self.iteration as f32 + 1f32);
