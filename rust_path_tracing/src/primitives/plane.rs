@@ -3,13 +3,15 @@ use crate::math::*;
 use crate::ray::*;
 
 pub struct Plane {
-    pub point: Vec3,
-    pub normal: Vec3,
+    point: Vec3,
+    normal: Vec3,
+
+    material_id : usize
 }
 
 impl Plane {
-    pub fn new(point: Vec3, normal: Vec3) -> Plane {
-        Plane { point, normal }
+    pub fn new(point: Vec3, normal: Vec3, material_id : usize) -> Plane {
+        Plane { point, normal, material_id }
     }
 }
 
@@ -36,6 +38,7 @@ impl Raytraceable for Plane {
         result.normal = self.normal.clone();
         //result.normal_facing_outside = sign(dot(plane.normal, -ray.direction));
         result.t = t;
+        result.material_id = self.material_id;
 
         result
     }

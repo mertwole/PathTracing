@@ -3,10 +3,12 @@ mod math;
 mod primitives;
 mod ray;
 mod scene;
+mod material;
 use crate::camera::*;
 use crate::scene::*;
 use crate::math::*;
 use crate::primitives::*;
+use crate::material::Material;
 
 fn main() {
     let camera = Camera{ 
@@ -19,7 +21,22 @@ fn main() {
     };
     let mut scene = Scene::new(camera);
 
-    scene.add_primitive(Box::new(Sphere::new(Vec3::new(0.0, 0.0, 0.0), 1.0)));
+    let mut materials : Vec<Material> = Vec::new();
+    materials.push(
+        Material 
+        { 
+            color : Vec3::new(1.0, 0.5, 0.25),
+            emission : Vec3::new(1.0, 1.0, 1.0), 
+            refraction : 1.0,
+            reflective : 0.4, 
+            emissive : 0.0, 
+            refractive : 0.0 
+        } 
+    );
+
+    scene.init_materials(materials);
+
+    scene.add_primitive(Box::new(Sphere::new(Vec3::new(0.0, 0.0, 0.0), 1.0, 0)));
 
     scene.iteration();
 

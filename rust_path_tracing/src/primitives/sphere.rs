@@ -3,18 +3,16 @@ use crate::math::*;
 use crate::ray::*;
 
 pub struct Sphere {
-    pub center: Vec3,
-    pub radius: f32,
+    center: Vec3,
+    radius: f32,
     radius_sqr: f32,
+
+    material_id : usize
 }
 
 impl Sphere {
-    pub fn new(center: Vec3, radius: f32) -> Sphere {
-        Sphere {
-            center,
-            radius,
-            radius_sqr: radius * radius,
-        }
+    pub fn new(center: Vec3, radius: f32, material_id : usize) -> Sphere {
+        Sphere { center, radius, radius_sqr: radius * radius, material_id }
     }
 }
 
@@ -46,13 +44,13 @@ impl Raytraceable for Sphere {
         //if we choose max value of t it means that ray is traced from inside
         //result.normal_facing_outside = -1;
         } else {
-            result.hit = false;
             return result;
         }
 
         result.point = &(result.t * &ray.direction) + &ray.source;
         result.normal = &(&result.point - &self.center) / self.radius;
         result.hit = true;
+        result.material_id = self.material_id;
 
         result
     }

@@ -5,6 +5,7 @@ pub struct RayTraceResult {
     pub point: Vec3,
     pub normal: Vec3,
     pub t: f32,
+    pub material_id : usize
 }
 
 impl RayTraceResult {
@@ -14,6 +15,7 @@ impl RayTraceResult {
             point: Vec3::zero(),
             normal: Vec3::zero(),
             t: 0.0,
+            material_id : 0
         }
     }
 }
@@ -28,11 +30,6 @@ pub struct Ray {
 
 impl Ray {
     pub fn new(source: Vec3, direction: Vec3, min: f32, max: f32) -> Ray {
-        Ray {
-            source,
-            direction,
-            min,
-            max,
-        }
+        Ray { source, direction, min, max }
     }
 }

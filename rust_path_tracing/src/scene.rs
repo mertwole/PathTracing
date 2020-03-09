@@ -2,6 +2,7 @@ use crate::camera::*;
 use crate::math::*;
 use crate::primitives::*;
 use crate::ray::{Ray, RayTraceResult};
+use crate::material::*;
 
 extern crate image;
 
@@ -43,6 +44,7 @@ pub struct Scene {
     iteration: u32,
 
     primitives: Vec<Box<dyn Raytraceable>>,
+    materials : Vec<Material>
 }
 
 impl Scene {
@@ -52,11 +54,16 @@ impl Scene {
             camera,         
             iteration: 0u32,
             primitives: Vec::new(),
+            materials : Vec::new()
         }
     }
 
     pub fn add_primitive(&mut self, primitive: Box<dyn Raytraceable>) {
         self.primitives.push(primitive);
+    }
+
+    pub fn init_materials(&mut self, materials : Vec<Material>) {
+        self.materials = materials;
     }
 
     fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
@@ -74,7 +81,7 @@ impl Scene {
     }
 
     fn get_color(&self, ray: &Ray) -> Vec3 {
-        let color = Vec3::new(0.1, 0.2, 0.4);
+        let color = if(self.trace_ray(ray).hit) { self.materials[self.trace_ray(ray).material_id].color } else { Vec3::zero() };
 
         // TODO : actually compute color
 
