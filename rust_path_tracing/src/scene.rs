@@ -5,6 +5,8 @@ use crate::ray::{Ray, RayTraceResult};
 use crate::material::*;
 
 extern crate image;
+extern crate rand;
+use rand::Rng;
 
 struct ImageBuffer{
     pixels : Vec<Vec3>,
@@ -28,9 +30,9 @@ impl ImageBuffer{
     fn save_to_file(&self, path : &std::path::Path) {
         let mut buffer : Vec<u8> = Vec::with_capacity(self.width * self.height * 3);
         for pixel in &self.pixels{
-            buffer.push((pixel.x * 255f32) as u8);
-            buffer.push((pixel.y * 255f32) as u8);
-            buffer.push((pixel.z * 255f32) as u8);
+            buffer.push((pixel.x.powf(1.0 / 2.2) * 255f32) as u8);
+            buffer.push((pixel.y.powf(1.0 / 2.2) * 255f32) as u8);
+            buffer.push((pixel.z.powf(1.0 / 2.2) * 255f32) as u8);
         }
 
         image::save_buffer_with_format(path, &buffer, self.width as u32, self.height as u32, image::ColorType::Rgb8 , image::ImageFormat::Bmp).unwrap();
@@ -44,7 +46,9 @@ pub struct Scene {
     iteration: u32,
 
     primitives: Vec<Box<dyn Raytraceable>>,
-    materials : Vec<Material>
+    materials : Vec<Material>,
+
+    rng : rand::prelude::ThreadRng
 }
 
 impl Scene {
@@ -54,7 +58,8 @@ impl Scene {
             camera,         
             iteration: 0u32,
             primitives: Vec::new(),
-            materials : Vec::new()
+            materials : Vec::new(),
+            rng : rand::thread_rng()
         }
     }
 
@@ -80,26 +85,58 @@ impl Scene {
         result
     }
 
-    fn get_color(&self, ray: &Ray) -> Vec3 {
-        let color = if(self.trace_ray(ray).hit) { self.materials[self.trace_ray(ray).material_id].color } else { Vec3::zero() };
+    fn get_color(&mut self, ray: &Ray, max_depth : u32) -> Vec3 {
+        if max_depth == 0 
+        { return Vec3::zero(); }
 
-        // TODO : actually compute color
+        let trace_result = self.trace_ray(ray);
+
+        if !trace_result.hit
+        { return Vec3::zero(); }
+
+        let random_num = self.rng.gen_range(0.0, 1.0);
+        let material = &self.materials[trace_result.material_id];
+
+        let color = 
+        if random_num < material.reflective { // reflect
+            let new_ray = Ray::new(trace_result.point, ray.direction.reflect(&trace_result.normal), std::f32::EPSILON, std::f32::MAX);
+            self.get_color(&new_ray, max_depth - 1)
+        }
+        else if random_num < material.reflective + material.emissive { // emit
+            material.emission
+        }
+        else if random_num < material.reflective + material.emissive + material.refractive { // refract
+            Vec3::zero()
+            // TODO
+        } 
+        else{ // diffuse
+            let mut new_direction = Vec3::new(self.rng.gen_range(-1.0, 1.0), self.rng.gen_range(-1.0, 1.0), self.rng.gen_range(-1.0, 1.0)).normalized();
+            if new_direction.dot(&trace_result.normal) < 0.0{
+                new_direction = &new_direction * -1.0;
+            }
+
+            let new_ray = Ray::new(trace_result.point, new_direction, std::f32::EPSILON, std::f32::MAX);
+            let new_color = &material.color.clone();
+            new_color * &self.get_color(&new_ray, max_depth - 1)
+        };
 
         color
     }
 
     pub fn iteration(&mut self) {
-        self.iteration += 1;
-
         for x in 0..self.camera.width {
             for y in 0..self.camera.height {
-                let color = self.get_color(&self.camera.get_ray(x, y));
+                let color = self.get_color(&self.camera.get_ray(x, y), 8);
                 let pixel = self.image.get_pixel_mut(x, y);
                 let mut new_color = &(&*pixel * self.iteration as f32) + &color;
-                new_color = &new_color / (self.iteration as f32 + 1f32);
+                new_color = &new_color / (self.iteration as f32 + 1.0);
                 *pixel = new_color;
             }
+
+            println!("iteration : {} x : {}", self.iteration, x);
         }
+
+        self.iteration += 1;
     }
 
     pub fn save_output(&self, path: &std::path::Path) {

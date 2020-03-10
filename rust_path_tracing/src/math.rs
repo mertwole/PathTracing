@@ -145,6 +145,10 @@ impl Vec3 {
             z: self.x * rhs.y - self.y * rhs.x,
         }
     }
+
+    pub fn reflect(&self, relative : &Vec3) -> Vec3{
+        self - &(2.0 * self.dot(relative) * relative)
+    }
 }
 
 impl ops::Add<&Vec3> for &Vec3 {

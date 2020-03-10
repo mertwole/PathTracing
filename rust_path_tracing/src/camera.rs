@@ -18,6 +18,6 @@ impl Camera {
         watch_dot.y += ((y as f32) / (self.height as f32) - 0.5) * self.viewport.y;
         let direction = &self.rotation * &(&watch_dot - &self.position);
 
-        Ray::new(self.position, direction.normalized(), 0.0, std::f32::MAX)
+        Ray::new(self.position, direction.normalized(), direction.length(), std::f32::MAX)
     }
 }
