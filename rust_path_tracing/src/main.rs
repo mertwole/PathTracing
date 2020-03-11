@@ -12,11 +12,11 @@ use crate::material::Material;
 
 fn main() {
     let camera = Camera{ 
-        width : 512, 
-        height : 512, 
-        position : Vec3::new(0.0, 0.0, 10.0),
+        width : 1920, 
+        height : 1080, 
+        position : Vec3::new(0.0, - 3.0 + 3.375 * 0.5 , 10.0),
         view_distance : 7.1,
-        viewport : Vec2::new(5.99, 5.99),
+        viewport : Vec2::new(5.99, 3.375),
         rotation : Mat3::create_rotation(0.0, 3.14, 0.0)
     };
     let mut scene = Scene::new(camera);
@@ -67,7 +67,7 @@ fn main() {
     scene.add_primitive(Box::new(Plane::new(Vec3::new(0.0, 0.0, -3.0), Vec3::new(0.0, 0.0, 1.0), 0)));
     scene.add_primitive(Box::new(Plane::new(Vec3::new(0.0, 0.0, 3.0), Vec3::new(0.0, 0.0, -1.0), 0)));
 
-    for _i in 0..100{
+    for _i in 0..512{
         scene.iteration();
     }
     
