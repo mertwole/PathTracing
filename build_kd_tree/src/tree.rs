@@ -1,23 +1,21 @@
 use crate::triangle::*;
 
-pub struct Tree{
-    triangles : Vec<Triangle>
+pub struct Tree {
+    triangles: Vec<Triangle>,
 }
 
-impl Tree{
-    pub fn new() -> Tree{
-        Tree { triangles : Vec::new() }
+impl Tree {
+    pub fn new() -> Tree {
+        Tree {
+            triangles: Vec::new(),
+        }
     }
 
-    pub fn load_triangles_obj(&mut self, path : &String){
+    pub fn load_triangles_obj(&mut self, path: &String) {}
 
-    }
+    pub fn build(&mut self) {}
 
-    pub fn build(&mut self){
+    fn split() {}
 
-    }
-
-    pub fn save(&mut self){
-        
-    }
+    pub fn save(&mut self) {}
 }
