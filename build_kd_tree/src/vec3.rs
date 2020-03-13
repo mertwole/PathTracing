@@ -22,6 +22,10 @@ impl Vec3 {
     pub fn dot(&self, rhs: &Vec3) -> f32 {
         self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
     }
+
+    pub fn clone(&self) -> Vec3{
+        Vec3 { x : self.x, y : self.y, z : self.z }
+    }
 }
 
 impl ops::Add<&Vec3> for &Vec3 {
@@ -35,5 +39,12 @@ impl ops::Sub<&Vec3> for &Vec3 {
     type Output = Vec3;
     fn sub(self, rhs: &Vec3) -> Vec3 {
         Vec3::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
+    }
+}
+
+impl ops::Mul<&Vec3> for &Vec3 {
+    type Output = Vec3;
+    fn mul(self, rhs: &Vec3) -> Vec3 {
+        Vec3::new(self.x * rhs.x, self.y * rhs.y, self.z * rhs.z)
     }
 }
