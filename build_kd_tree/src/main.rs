@@ -8,7 +8,7 @@ use crate::tree::*;
 fn main() {
     let mut tree = Tree::new();
     load_triangles_from_files(&mut tree);
-    tree.build();
+    tree.build(16);
     tree.save();
 }
 

@@ -42,12 +42,51 @@ impl Tree {
 
     pub fn load_triangles_obj(&mut self, path: &String) {}
 
-    pub fn build(&mut self) {}
+    pub fn build(&mut self, depth : u32) {
+        let mut root = self.init_root();
+        self.split_root(&mut root, depth);
+    }
 
     pub fn save(&mut self) {}
 
+    fn init_root(&mut self) -> TreeNode{
+        let mut root = TreeNode::new();
+        root.bounding_box = AABB::new(Vec3::new_xyz(std::f32::INFINITY), Vec3::new_xyz(std::f32::NEG_INFINITY));
+        // Get bounding box for all triangles
+        for triangle in &self.triangles{
+            for i in 0..3{
+                if root.bounding_box.min.x > triangle.points[i].x { root.bounding_box.min.x = triangle.points[i].x; }
+                if root.bounding_box.min.y > triangle.points[i].y { root.bounding_box.min.y = triangle.points[i].y; }
+                if root.bounding_box.min.z > triangle.points[i].z { root.bounding_box.min.z = triangle.points[i].z; }
 
-    fn split(&mut self, root : &mut TreeNode, depth : u32, max_depth : u32) {
+                if root.bounding_box.max.x < triangle.points[i].x { root.bounding_box.max.x = triangle.points[i].x; }
+                if root.bounding_box.max.y < triangle.points[i].y { root.bounding_box.max.y = triangle.points[i].y; }
+                if root.bounding_box.max.z < triangle.points[i].z { root.bounding_box.max.z = triangle.points[i].z; }
+            }
+        }
+        let threshold = Vec3::new_xyz(std::f32::EPSILON * 10.0);
+        root.bounding_box.min = &root.bounding_box.min - &threshold;
+        root.bounding_box.max = &root.bounding_box.max + &threshold;
+
+        root.triangle_ids = (0..self.triangles.len()).collect();
+
+        root
+    }
+
+    fn split_root(&self, root : &mut TreeNode, depth : u32){
+        if depth > 3{
+            self.split_root_multithread(root, depth);
+        }
+        else {
+            self.split(root, 0, depth);
+        }
+    }
+
+    fn split_root_multithread(&self, root : &mut TreeNode, depth : u32){
+        self.split(root, 0, depth);
+    }
+
+    fn split(&self, root : &mut TreeNode, depth : u32, max_depth : u32) {
         if depth > max_depth - 2{
             return;
         }
@@ -90,7 +129,7 @@ impl Tree {
         if right_node.triangle_ids.len() > MAX_TRIANGLES{
             self.split(&mut right_node, depth + 1, max_depth);
         }
-        
+
         root.left = Some(Box::new(left_node));
         root.right = Some(Box::new(right_node));
     }

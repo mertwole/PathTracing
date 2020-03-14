@@ -15,6 +15,10 @@ impl Vec3 {
         Vec3 {x : 0.0, y : 0.0, z : 0.0}
     }
 
+    pub fn new_xyz(xyz : f32) -> Vec3{
+        Vec3 { x : xyz, y : xyz, z : xyz }
+    }
+
     pub fn cross(&self, rhs: &Vec3) -> Vec3 {
         Vec3 {
             x: self.y * rhs.z - self.z * rhs.y,
