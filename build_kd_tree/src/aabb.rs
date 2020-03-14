@@ -9,4 +9,8 @@ impl AABB{
     pub fn new(min : Vec3, max : Vec3) -> AABB{
         AABB { min, max } 
     }
+
+    pub fn void() -> AABB{
+        AABB { min : Vec3::zero(), max : Vec3::zero() }
+    }
 }

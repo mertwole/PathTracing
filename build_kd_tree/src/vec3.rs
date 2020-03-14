@@ -11,6 +11,10 @@ impl Vec3 {
         Vec3 { x, y, z }
     }
 
+    pub fn zero() -> Vec3{
+        Vec3 {x : 0.0, y : 0.0, z : 0.0}
+    }
+
     pub fn cross(&self, rhs: &Vec3) -> Vec3 {
         Vec3 {
             x: self.y * rhs.z - self.z * rhs.y,
@@ -46,5 +50,12 @@ impl ops::Mul<&Vec3> for &Vec3 {
     type Output = Vec3;
     fn mul(self, rhs: &Vec3) -> Vec3 {
         Vec3::new(self.x * rhs.x, self.y * rhs.y, self.z * rhs.z)
+    }
+}
+
+impl ops::Mul<f32> for &Vec3 {
+    type Output = Vec3;
+    fn mul(self, rhs: f32) -> Vec3 {
+        Vec3::new(self.x * rhs, self.y * rhs, self.z * rhs)
     }
 }

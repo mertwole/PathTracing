@@ -3,20 +3,34 @@ use crate::triangle::*;
 use crate::vec3::*;
 use crate::aabb::*;
 
+const SAH_SAMPLES : u32 = 16;
+const MAX_TRIANGLES : usize = 8;
+
 pub struct Tree {
     triangles: Vec<Triangle>,
 }
 
 struct TreeNode {
-    left : Box<TreeNode>,
-    right : Box<TreeNode>,
-    parent : Box<TreeNode>,
-
+    left : Option<Box<TreeNode>>,
+    right : Option<Box<TreeNode>>,
     bounding_box : AABB,
 
     triangle_ids : Vec<usize>,
 
     global_id : u32
+}
+
+
+impl TreeNode{
+    fn new() -> TreeNode{
+        TreeNode { 
+            left : Option::None, 
+            right : Option::None,  
+            bounding_box : AABB::void(),           
+            triangle_ids : Vec::new(),
+            global_id : 0
+        }
+    }
 }
 
 impl Tree {
@@ -33,13 +47,59 @@ impl Tree {
     pub fn save(&mut self) {}
 
 
-    fn split() {}
+    fn split(&mut self, root : &mut TreeNode, depth : u32, max_depth : u32) {
+        if depth > max_depth - 2{
+            return;
+        }
+            
+        // Find optimal split plane
+        let mut min_sah = std::f32::INFINITY;   
+        // Pick largest dimension
+        let diagonal = &root.bounding_box.max - &root.bounding_box.min;
+        let split_normal = 
+        if diagonal.x > diagonal.y && diagonal.x > diagonal.z{ Vec3::new(1.0, 0.0, 0.0) }
+        else if diagonal.y > diagonal.z { Vec3::new(0.0, 1.0, 0.0) }
+        else{ Vec3::new(0.0, 0.0, 1.0) };
+        // Sample SAH
+        let mut split_pos = Vec3::zero();
+        for i in 1..SAH_SAMPLES{
+            let pos = &root.bounding_box.min + &(&diagonal * (i as f32 / SAH_SAMPLES as f32));
+            let sah = self.compute_sah(root, &split_normal, &pos);
+            if sah < min_sah { split_pos = pos; min_sah = sah; }
+        }
+        // Init childs
+        let mut left_node = TreeNode::new();
+        let mut right_node = TreeNode::new();
 
-    fn compute_sah(&self, node : TreeNode, split_normal : Vec3, split_pos : Vec3) -> f32{
+        let (left_aabb, right_aabb) = Tree::split_aabb(&root.bounding_box, &split_pos, &split_normal);
+        left_node.bounding_box = left_aabb;
+        right_node.bounding_box = right_aabb;
+
+        for &triangle_id in &root.triangle_ids{
+            if Tree::triangle_vs_aabb(&self.triangles[triangle_id], &left_node.bounding_box){
+                left_node.triangle_ids.push(triangle_id)
+            }
+            if Tree::triangle_vs_aabb(&self.triangles[triangle_id], &right_node.bounding_box){
+                right_node.triangle_ids.push(triangle_id)
+            }
+        }
+
+        if left_node.triangle_ids.len() > MAX_TRIANGLES{
+            self.split(&mut left_node, depth + 1, max_depth);
+        }
+        if right_node.triangle_ids.len() > MAX_TRIANGLES{
+            self.split(&mut right_node, depth + 1, max_depth);
+        }
+        
+        root.left = Some(Box::new(left_node));
+        root.right = Some(Box::new(right_node));
+    }
+
+    fn compute_sah(&self, node : &TreeNode, split_normal : &Vec3, split_pos : &Vec3) -> f32{
         let diagonal = &node.bounding_box.max - &node.bounding_box.min;
 
         let aabb_areas = Vec3::new(diagonal.y * diagonal.z, diagonal.x * diagonal.z, diagonal.x * diagonal.y);
-        let left_ratio = (&split_pos - &node.bounding_box.min).dot(&split_normal) / diagonal.dot(&split_normal);
+        let left_ratio = (split_pos - &node.bounding_box.min).dot(split_normal) / diagonal.dot(&split_normal);
         let left_multiplier = Vec3::new(
             if split_normal.x != 0.0 {1.0} else {left_ratio},
             if split_normal.y != 0.0 {1.0} else {left_ratio},
@@ -53,16 +113,10 @@ impl Tree {
             if split_normal.z != 0.0 {1.0} else {right_ratio},
         );
         let right_part_area = aabb_areas.dot(&right_multiplier);
-
-        let split_pos_along_normal = &split_normal * &split_pos;
-        let one_minus_normal = &(&Vec3::new(1.0, 1.0, 1.0) - &split_normal);
-        let separating_point_left = &split_pos_along_normal + &(one_minus_normal * &node.bounding_box.max);
-        let separating_point_right = &split_pos_along_normal + &(one_minus_normal * &node.bounding_box.min);
-        let left_aabb = AABB::new(node.bounding_box.min.clone(), separating_point_left);
-        let right_aabb = AABB::new(separating_point_right, node.bounding_box.max.clone());
+        let (left_aabb, right_aabb) = Tree::split_aabb(&node.bounding_box, &split_pos, &split_normal);
   
         let (mut left_triangles, mut right_triangles) = (0.0, 0.0);    
-        for triangle_id in node.triangle_ids{
+        for &triangle_id in &node.triangle_ids{
             if Tree::triangle_vs_aabb(&self.triangles[triangle_id], &left_aabb) { 
                 left_triangles += 1.0; 
             }
@@ -144,6 +198,15 @@ impl Tree {
     
         true
     }  
+
+    fn split_aabb(aabb : &AABB, plane_pos : &Vec3, plane_normal : &Vec3) -> (AABB, AABB){
+        let split_pos_along_normal = plane_pos * plane_normal;
+        let one_minus_normal = &Vec3::new(1.0, 1.0, 1.0) - &plane_normal;
+        (
+            AABB::new(aabb.min.clone(), &split_pos_along_normal + &(&one_minus_normal * &aabb.max)), 
+            AABB::new(&split_pos_along_normal + &(&one_minus_normal * &aabb.min), aabb.max.clone())
+        )
+    }
 }
 
 fn small_enought(a : f32) -> bool{
