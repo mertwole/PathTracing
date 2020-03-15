@@ -63,3 +63,10 @@ impl ops::Mul<f32> for &Vec3 {
         Vec3::new(self.x * rhs, self.y * rhs, self.z * rhs)
     }
 }
+
+impl ops::Div<f32> for &Vec3 {
+    type Output = Vec3;
+    fn div(self, rhs: f32) -> Vec3 {
+        Vec3::new(self.x / rhs, self.y / rhs, self.z / rhs)
+    }
+}
