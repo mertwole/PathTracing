@@ -10,7 +10,7 @@ fn main() {
     let mut tree = Tree::new();
     load_triangles_from_files(&mut tree);
     tree.build(16);
-    tree.save();
+    tree.save("tree.txt");
 }
 
 fn load_triangles_from_files(tree : &mut Tree){

@@ -3,11 +3,15 @@ use crate::obj_loader::*;
 use crate::triangle::*;
 use crate::vec3::*;
 
+use std::fs::File;
+use std::io::prelude::*;
+
 const SAH_SAMPLES: u32 = 16;
 const MAX_TRIANGLES: usize = 8;
 
 pub struct Tree {
     triangles: Vec<Triangle>,
+    root : TreeNode
 }
 
 struct TreeNode {
@@ -18,6 +22,11 @@ struct TreeNode {
     triangle_ids: Vec<usize>,
 
     global_id: u32,
+    parent_id : i32,
+    left_id : u32,
+    right_id : u32,
+
+    is_leaf : bool
 }
 
 impl TreeNode {
@@ -27,8 +36,30 @@ impl TreeNode {
             right: Option::None,
             bounding_box: AABB::void(),
             triangle_ids: Vec::new(),
-            global_id: 0,
+
+            global_id : 0,
+            parent_id : 0,
+            left_id : 0,
+            right_id : 0,
+
+            is_leaf : false
         }
+    }
+
+    fn get_text_description(&self) -> String{
+         "global_id ".to_string() + &self.global_id.to_string() + &" ".to_string() + 
+        &"parent_id ".to_string() + &self.parent_id.to_string() + &" ".to_string() + 
+        &"left_id ".to_string()   + &self.left_id.to_string()   + &" ".to_string() + 
+        &"right_id ".to_string()  + &self.right_id.to_string()  + &" ".to_string() + 
+        &if self.is_leaf { 
+            let mut triangle_id_str = String::new();
+            for triangle_id in &self.triangle_ids{
+                triangle_id_str += &triangle_id.to_string();
+                triangle_id_str += &" ";
+            }
+            triangle_id_str
+        } 
+        else { "".to_string() }
     }
 }
 
@@ -36,6 +67,7 @@ impl Tree {
     pub fn new() -> Tree {
         Tree {
             triangles: Vec::new(),
+            root : TreeNode::new()
         }
     }
 
@@ -46,9 +78,73 @@ impl Tree {
     pub fn build(&mut self, depth: u32) {
         let mut root = self.init_root();
         self.split_root(&mut root, depth);
+        self.root = root;
     }
 
-    pub fn save(&self) {}
+    pub fn save(&mut self, name : &str) {
+        self.prepare_save();
+        self.save_to_file(name);
+    }
+
+    fn save_to_file(&self, name : &str){
+        let mut file = File::create(name).unwrap();
+        Tree::save_recursively(&self.root, &mut file);    
+    }
+
+    fn save_recursively(node : &TreeNode, file : &mut File){
+        let line = node.get_text_description();
+        file.write(line.as_bytes()).unwrap();
+        file.write("\n".as_bytes()).unwrap();
+
+        match &node.left{
+            Some(left) => {Tree::save_recursively(&left, file); }
+            _=>{}
+        }
+        match &node.right{
+            Some(right) => {Tree::save_recursively(&right, file); }
+            _=>{}
+        }
+    }
+
+    fn prepare_save(&mut self){
+        self.root.parent_id = -1;
+        let root_layer = vec!(&mut self.root);
+        Tree::set_layer_ids(root_layer, 0);
+    }
+
+    fn set_layer_ids(curr_layer : Vec<&mut TreeNode>, curr_layer_max_id : i32){
+        let mut next_layer : Vec<&mut TreeNode> = Vec::new();
+        let mut next_layer_max_id = curr_layer_max_id;
+        let mut not_all_leaves = false;
+        for node in curr_layer{
+            match &mut node.left{
+                Some(left) => {
+                    not_all_leaves = true;
+                    next_layer.push(left.as_mut());
+                    let left = next_layer.last_mut().unwrap();
+                    next_layer_max_id += 1;
+                    left.global_id = next_layer_max_id as u32;
+                    left.parent_id = node.global_id as i32;
+                    node.left_id = left.global_id;
+                }
+                _=>{ node.is_leaf = true; }
+            }
+            match &mut node.right{
+                Some(right) => {
+                    not_all_leaves = true;
+                    next_layer.push(right.as_mut());
+                    let right = next_layer.last_mut().unwrap();
+                    next_layer_max_id += 1;
+                    right.global_id = next_layer_max_id as u32;
+                    right.parent_id = node.global_id as i32;
+                    node.right_id = right.global_id;
+                }
+                _=>{ node.is_leaf = true; }
+            }
+        }
+
+        if not_all_leaves{ Tree::set_layer_ids(next_layer, next_layer_max_id); }
+    }
 
     fn init_root(&mut self) -> TreeNode {
         let mut root = TreeNode::new();
