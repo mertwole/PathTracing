@@ -49,17 +49,20 @@ impl TreeNode {
     fn get_text_description(&self) -> String{
          "global_id ".to_string() + &self.global_id.to_string() + &" ".to_string() + 
         &"parent_id ".to_string() + &self.parent_id.to_string() + &" ".to_string() + 
-        &"left_id ".to_string()   + &self.left_id.to_string()   + &" ".to_string() + 
-        &"right_id ".to_string()  + &self.right_id.to_string()  + &" ".to_string() + 
+       
         &if self.is_leaf { 
-            let mut triangle_id_str = String::new();
+            let mut triangle_id_str = "triangle_ids : ".to_string();
             for triangle_id in &self.triangle_ids{
                 triangle_id_str += &triangle_id.to_string();
                 triangle_id_str += &" ";
             }
             triangle_id_str
         } 
-        else { "".to_string() }
+        else 
+        {  
+            "left_id ".to_string()   + &self.left_id.to_string()   + &" ".to_string() + 
+            &"right_id ".to_string()  + &self.right_id.to_string()  + &" ".to_string()
+        }
     }
 }
 
@@ -83,12 +86,8 @@ impl Tree {
 
     pub fn save(&mut self, name : &str) {
         self.prepare_save();
-        self.save_to_file(name);
-    }
-
-    fn save_to_file(&self, name : &str){
         let mut file = File::create(name).unwrap();
-        Tree::save_recursively(&self.root, &mut file);    
+        Tree::save_recursively(&self.root, &mut file); 
     }
 
     fn save_recursively(node : &TreeNode, file : &mut File){
@@ -316,6 +315,7 @@ impl Tree {
     }
 
     fn triangle_vs_aabb(triangle: &Triangle, aabb: &AABB) -> bool {
+
         let aabb_vertices: [&Vec3; 8] = [
             &aabb.min,
             &Vec3::new(aabb.max.x, aabb.min.y, aabb.min.z),
@@ -356,6 +356,7 @@ impl Tree {
         }
 
         let check_box_side = |point_ids: [usize; 3], opposite_side_point_id: usize| {
+
             let normal = (aabb_vertices[point_ids[0]] - aabb_vertices[point_ids[1]])
                 .cross(&(aabb_vertices[point_ids[0]] - aabb_vertices[point_ids[2]]));
             let d = -normal.dot(aabb_vertices[point_ids[0]]);

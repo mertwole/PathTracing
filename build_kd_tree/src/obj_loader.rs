@@ -32,7 +32,7 @@ impl OBJLoader {
                 for i in 0..3{
                     ids[i] = get_first_num(ids_iter.next().unwrap());
                 }
-                out_triangles.push(Triangle {points : [verts[ids[0] - 1].clone(), verts[ids[0] - 1].clone(), verts[ids[0] - 1].clone()]});
+                out_triangles.push(Triangle {points : [verts[ids[0] - 1].clone(), verts[ids[1] - 1].clone(), verts[ids[2] - 1].clone()]});
             }
         }
     }
