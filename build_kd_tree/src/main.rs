@@ -8,9 +8,20 @@ use crate::tree::*;
 
 fn main() {
     let mut tree = Tree::new();
+    
     load_triangles_from_files(&mut tree);
-    tree.build(9);
+
+    let depth = ask_depth();
+    tree.build(depth);
+
     tree.save("tree.txt");
+}
+
+fn ask_depth() -> u32{
+    println!("depth?");
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+    input.trim().parse().unwrap()
 }
 
 fn load_triangles_from_files(tree : &mut Tree){
