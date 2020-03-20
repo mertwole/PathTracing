@@ -6,11 +6,11 @@ pub struct Plane {
     point: Vec3,
     normal: Vec3,
 
-    material_id : usize
+    material_id: usize,
 }
 
 impl Plane {
-    pub fn new(point: Vec3, normal: Vec3, material_id : usize) -> Plane {
+    pub fn new(point: Vec3, normal: Vec3, material_id: usize) -> Plane {
         Plane { point, normal, material_id }
     }
 }

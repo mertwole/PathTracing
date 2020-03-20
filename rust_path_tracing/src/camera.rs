@@ -2,12 +2,12 @@ use crate::math::*;
 use crate::ray::*;
 
 pub struct Camera {
-    pub width: usize, 
-    pub height: usize, 
-    pub viewport : Vec2, 
-    pub rotation : Mat3, 
-    pub view_distance : f32, 
-    pub position : Vec3
+    pub width: usize,
+    pub height: usize,
+    pub viewport: Vec2,
+    pub rotation: Mat3,
+    pub view_distance: f32,
+    pub position: Vec3,
 }
 
 impl Camera {
@@ -18,6 +18,11 @@ impl Camera {
         watch_dot.y += ((y as f32) / (self.height as f32) - 0.5) * self.viewport.y;
         let direction = &self.rotation * &(&watch_dot - &self.position);
 
-        Ray::new(self.position, direction.normalized(), direction.length(), std::f32::MAX)
+        Ray::new(
+            self.position,
+            direction.normalized(),
+            direction.length(),
+            std::f32::MAX,
+        )
     }
 }

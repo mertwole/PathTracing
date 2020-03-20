@@ -7,11 +7,11 @@ pub struct Sphere {
     radius: f32,
     radius_sqr: f32,
 
-    material_id : usize
+    material_id: usize,
 }
 
 impl Sphere {
-    pub fn new(center: Vec3, radius: f32, material_id : usize) -> Sphere {
+    pub fn new(center: Vec3, radius: f32, material_id: usize) -> Sphere {
         Sphere { center, radius, radius_sqr: radius * radius, material_id }
     }
 }
