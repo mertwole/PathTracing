@@ -11,12 +11,20 @@ impl Vec3 {
         Vec3 { x, y, z }
     }
 
-    pub fn zero() -> Vec3{
-        Vec3 {x : 0.0, y : 0.0, z : 0.0}
+    pub fn zero() -> Vec3 {
+        Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }
     }
 
-    pub fn new_xyz(xyz : f32) -> Vec3{
-        Vec3 { x : xyz, y : xyz, z : xyz }
+    pub fn new_xyz(xyz: f32) -> Vec3 {
+        Vec3 {
+            x: xyz,
+            y: xyz,
+            z: xyz,
+        }
     }
 
     pub fn cross(&self, rhs: &Vec3) -> Vec3 {
@@ -31,8 +39,12 @@ impl Vec3 {
         self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
     }
 
-    pub fn clone(&self) -> Vec3{
-        Vec3 { x : self.x, y : self.y, z : self.z }
+    pub fn clone(&self) -> Vec3 {
+        Vec3 {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+        }
     }
 }
 
