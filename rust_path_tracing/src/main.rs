@@ -1,13 +1,13 @@
 mod camera;
 mod material;
 mod math;
-mod primitives;
+mod raytraceable;
 mod ray;
 mod scene;
 use crate::camera::*;
 use crate::material::Material;
 use crate::math::*;
-use crate::primitives::*;
+use crate::raytraceable::*;
 use crate::scene::*;
 
 fn main() {

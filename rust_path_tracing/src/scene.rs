@@ -1,7 +1,7 @@
 use crate::camera::*;
 use crate::material::*;
 use crate::math::*;
-use crate::primitives::*;
+use crate::raytraceable::*;
 use crate::ray::{Ray, RayTraceResult};
 
 extern crate image;

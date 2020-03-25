@@ -9,12 +9,7 @@ use std::io::prelude::*;
 const SAH_SAMPLES: u32 = 16;
 const MAX_TRIANGLES: usize = 8;
 
-pub struct Tree {
-    triangles: Vec<Triangle>,
-    root: TreeNode,
-}
-
-struct TreeNode {
+pub struct TreeNode {
     left: Option<Box<TreeNode>>,
     right: Option<Box<TreeNode>>,
     bounding_box: AABB,
@@ -30,7 +25,7 @@ struct TreeNode {
 }
 
 impl TreeNode {
-    fn new() -> TreeNode {
+    pub fn new() -> TreeNode {
         TreeNode {
             left: Option::None,
             right: Option::None,
@@ -46,8 +41,7 @@ impl TreeNode {
         }
     }
 
-    fn get_text_description(&self) -> String {
-        let id = "id ".to_string() + &self.global_id.to_string() + &" ".to_string();
+    pub fn get_text_description(&self) -> String {
         let box_min = "box_min ".to_string()
             + &self.bounding_box.min.x.to_string()
             + &" ".to_string()
@@ -63,7 +57,8 @@ impl TreeNode {
             + &self.bounding_box.max.z.to_string()
             + &" ".to_string();
         let parent = "p ".to_string() + &self.parent_id.to_string() + &" ".to_string();
-        id + &box_min
+        
+            box_min
             + &box_max
             + &parent
             + &if self.is_leaf {
@@ -75,13 +70,18 @@ impl TreeNode {
                 triangles_str
             } else {
                 "l ".to_string()
-                    + &self.left_id.to_string()
-                    + &" ".to_string()
-                    + &"r ".to_string()
-                    + &self.right_id.to_string()
-                    + &" ".to_string()
+                + &self.left_id.to_string()
+                + &" ".to_string()
+                + &"r ".to_string()
+                + &self.right_id.to_string()
+                + &" ".to_string()
             }
     }
+}
+
+pub struct Tree {
+    triangles: Vec<Triangle>,
+    root: TreeNode,
 }
 
 impl Tree {
@@ -92,14 +92,13 @@ impl Tree {
         }
     }
 
-    // Load
-
+    // region load
     pub fn load_triangles(&mut self, path: &String) {
         OBJLoader::load_obj(path, &mut self.triangles);
     }
+    // endregion
 
-    // Build
-
+    //region build
     pub fn build(&mut self, depth: u32) {
         let mut root = self.init_root();
         self.split_root(&mut root, depth);
@@ -273,31 +272,40 @@ impl Tree {
 
         left_part_area * left_triangles + right_part_area * right_triangles
     }
+    // endregion
 
-    // Save
-
+    // region save
     pub fn save(&mut self, name: &str) {
         self.prepare_save();
         let mut file = File::create(name).unwrap();
-        Tree::save_recursively(&self.root, &mut file);
+        let mut node_list : Vec<&TreeNode> = Vec::new();
+        Tree::get_node_list_recursively(&self.root, &mut node_list);
+        node_list.sort_by(|a, b| a.global_id.cmp(&b.global_id));
+        Tree::save_node_list(&node_list, &mut file);
     }
 
-    fn save_recursively(node: &TreeNode, file: &mut File) {
-        let line = node.get_text_description();
-        file.write(line.as_bytes()).unwrap();
-        file.write("\n".as_bytes()).unwrap();
-
+    fn get_node_list_recursively<'a>(node : &'a TreeNode, node_list : &mut Vec<&'a TreeNode>){
         match &node.left {
             Some(left) => {
-                Tree::save_recursively(&left, file);
+                Tree::get_node_list_recursively(&left, node_list);
             }
             _ => {}
         }
         match &node.right {
             Some(right) => {
-                Tree::save_recursively(&right, file);
+                Tree::get_node_list_recursively(&right, node_list);
             }
             _ => {}
+        }
+
+        node_list.push(node);
+    }
+
+    fn save_node_list(node_list : &Vec<&TreeNode>, file : &mut File){
+        for node in node_list{
+            let line = node.get_text_description();
+            file.write(line.as_bytes()).unwrap();
+            file.write("\n".as_bytes()).unwrap();
         }
     }
 
@@ -307,6 +315,7 @@ impl Tree {
         Tree::set_layer_ids(root_layer, 0);
     }
 
+    // Set parent, left, right and global ids to tree's layer
     fn set_layer_ids(curr_layer: Vec<&mut TreeNode>, curr_layer_max_id: i32) {
         let mut next_layer: Vec<&mut TreeNode> = Vec::new();
         let mut next_layer_max_id = curr_layer_max_id;
@@ -346,4 +355,5 @@ impl Tree {
             Tree::set_layer_ids(next_layer, next_layer_max_id);
         }
     }
+    // endregion
 }
