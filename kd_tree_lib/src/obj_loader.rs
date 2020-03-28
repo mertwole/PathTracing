@@ -1,5 +1,7 @@
 use crate::triangle::*;
-use crate::vec3::*;
+
+extern crate math_lib;
+use math_lib::Vec3;
 
 use std::fs::File;
 use std::io::prelude::*;

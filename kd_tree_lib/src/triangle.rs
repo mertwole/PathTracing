@@ -1,15 +1,13 @@
 use crate::aabb::*;
-use crate::vec3::*;
+
+extern crate math_lib;
+use math_lib::Vec3;
 
 pub struct Triangle {
     pub points: [Vec3; 3],
 }
 
 impl Triangle {
-    pub fn new(points: [Vec3; 3]) -> Triangle {
-        Triangle { points }
-    }
-
     pub fn check_with_aabb(&self, aabb: &AABB) -> bool {
         let aabb_vertices: [&Vec3; 8] = [
             &aabb.min,

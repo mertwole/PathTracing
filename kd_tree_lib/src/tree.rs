@@ -1,20 +1,40 @@
 use crate::aabb::*;
 use crate::obj_loader::*;
 use crate::triangle::*;
-use crate::vec3::*;
+
+extern crate math_lib;
+use math_lib::Vec3;
 
 use std::fs::File;
 use std::io::prelude::*;
+use std::io::BufReader;
 
 const SAH_SAMPLES: u32 = 16;
 const MAX_TRIANGLES: usize = 8;
 
-pub struct TreeNode {
-    left: Option<Box<TreeNode>>,
-    right: Option<Box<TreeNode>>,
-    bounding_box: AABB,
+impl AABB{
+    fn split(&self, plane_pos: &Vec3, plane_normal: &Vec3) -> (AABB, AABB) {
+        let split_pos_along_normal = plane_pos * plane_normal;
+        let one_minus_normal = &Vec3::new(1.0, 1.0, 1.0) - &plane_normal;
+        (
+            AABB::new(
+                self.min.clone(),
+                &split_pos_along_normal + &(&one_minus_normal * &self.max),
+            ),
+            AABB::new(
+                &split_pos_along_normal + &(&one_minus_normal * &self.min),
+                self.max.clone(),
+            ),
+        )
+    }
+}
 
-    triangle_ids: Vec<usize>,
+pub struct TreeNode {
+    pub left: Option<Box<TreeNode>>,
+    pub right: Option<Box<TreeNode>>,
+    pub bounding_box: AABB,
+
+    pub triangle_ids: Vec<usize>,
 
     global_id: u32,
     parent_id: i32,
@@ -41,7 +61,7 @@ impl TreeNode {
         }
     }
 
-    pub fn get_text_description(&self) -> String {
+    fn get_text_description(&self) -> String {
         let box_min = "box_min ".to_string()
             + &self.bounding_box.min.x.to_string()
             + &" ".to_string()
@@ -49,39 +69,55 @@ impl TreeNode {
             + &" ".to_string()
             + &self.bounding_box.min.z.to_string()
             + &" ".to_string();
-        let box_max = "box_max ".to_string()
+        let box_max = " box_max ".to_string()
             + &self.bounding_box.max.x.to_string()
             + &" ".to_string()
             + &self.bounding_box.max.y.to_string()
             + &" ".to_string()
-            + &self.bounding_box.max.z.to_string()
-            + &" ".to_string();
-        let parent = "p ".to_string() + &self.parent_id.to_string() + &" ".to_string();
+            + &self.bounding_box.max.z.to_string();
+        let parent = " p ".to_string() + &self.parent_id.to_string();
         
             box_min
             + &box_max
             + &parent
             + &if self.is_leaf {
-                let mut triangles_str = "tris ".to_string();
+                let mut triangles_str = " tris".to_string();
                 for triangle_id in &self.triangle_ids {
-                    triangles_str += &triangle_id.to_string();
                     triangles_str += &" ";
+                    triangles_str += &triangle_id.to_string();             
                 }
                 triangles_str
             } else {
-                "l ".to_string()
+                " l ".to_string()
                 + &self.left_id.to_string()
-                + &" ".to_string()
-                + &"r ".to_string()
+                + &" r ".to_string()
                 + &self.right_id.to_string()
-                + &" ".to_string()
             }
+    }
+}
+
+struct TreeNodeAdditionalData{
+    pub node : TreeNode,
+
+    pub left : usize,
+    pub right : usize,
+    pub is_leaf : bool
+}
+
+impl TreeNodeAdditionalData{
+    fn void() -> TreeNodeAdditionalData{
+        TreeNodeAdditionalData { 
+            node : TreeNode::new(), 
+            left : 0, 
+            right : 0, 
+            is_leaf : false 
+        }
     }
 }
 
 pub struct Tree {
     triangles: Vec<Triangle>,
-    root: TreeNode,
+    pub root: TreeNode,
 }
 
 impl Tree {
@@ -92,13 +128,95 @@ impl Tree {
         }
     }
 
-    // region load
+    // region load from file
+    pub fn load(&mut self, path : &String){
+        let mut nodes = Tree::load_nodes(path);
+        self.root = Tree::build_from_nodes_recursively(0, &mut nodes);
+    }
+
+    pub fn get_tree_from_file(path : &String) -> TreeNode{
+        let mut nodes = Tree::load_nodes(path);
+        Tree::build_from_nodes_recursively(0, &mut nodes)
+    }
+
+    fn build_from_nodes_recursively(root_id : usize, nodes : &mut Vec<TreeNodeAdditionalData>) -> TreeNode{
+        // Hack to move out of Vec saving root parameters before
+        let root_is_leaf = nodes[root_id].is_leaf;
+        let left_id = nodes[root_id].left;
+        let right_id = nodes[root_id].right;
+        
+        let mut root = nodes.remove(root_id).node;
+        nodes.insert(root_id, TreeNodeAdditionalData::void());
+
+        if root_is_leaf { return root; }
+
+        root.left = Option::Some(Box::new(
+            Tree::build_from_nodes_recursively(left_id, nodes)
+        ));
+        root.right = Option::Some(Box::new(
+            Tree::build_from_nodes_recursively(right_id, nodes)
+        ));
+
+        root
+    }
+
+    fn load_nodes(path : &String) -> Vec<TreeNodeAdditionalData>{
+        let reader = BufReader::new(File::open(path.as_str()).unwrap());
+        let mut nodes : Vec<TreeNodeAdditionalData> = Vec::new();
+        for line in reader.lines(){
+            let line = line.unwrap();   
+            nodes.push(Tree::load_node(&line));
+        }
+        nodes
+    }
+
+    fn load_node(line : &String) -> TreeNodeAdditionalData {
+        let mut node = TreeNodeAdditionalData { node : TreeNode::new(), left : 0, right : 0, is_leaf : false };
+        let mut word_iter = line.split_whitespace();
+        loop {
+            let word = word_iter.next();
+            if word.is_none() { break; } 
+            let word = word.unwrap();
+            match word{
+                "box_min" | "box_max" => { 
+                    let x : f32 = word_iter.next().unwrap().parse().unwrap();
+                    let y : f32 = word_iter.next().unwrap().parse().unwrap();
+                    let z : f32 = word_iter.next().unwrap().parse().unwrap();
+                    
+                    if word == "box_min"{
+                        node.node.bounding_box.min = Vec3::new(x, y, z);
+                    }
+                    else {
+                        node.node.bounding_box.max = Vec3::new(x, y, z);
+                    }               
+                }
+                "l" => { node.left = word_iter.next().unwrap().parse().unwrap(); }
+                "r" => { node.right = word_iter.next().unwrap().parse().unwrap(); }
+                "tris" => {
+                    node.is_leaf = true;
+                    loop{
+                        let tr_id = word_iter.next();
+                        match tr_id{
+                            Some(id) => { node.node.triangle_ids.push(id.parse().unwrap()); }
+                            None => { break; }
+                        }
+                    }
+                } 
+                _ => { }
+            }
+        }
+
+        node
+    }
+    // endregion
+
+    // region load triangles
     pub fn load_triangles(&mut self, path: &String) {
         OBJLoader::load_obj(path, &mut self.triangles);
     }
     // endregion
 
-    //region build
+    // region build
     pub fn build(&mut self, depth: u32) {
         let mut root = self.init_root();
         self.split_root(&mut root, depth);
@@ -302,10 +420,13 @@ impl Tree {
     }
 
     fn save_node_list(node_list : &Vec<&TreeNode>, file : &mut File){
-        for node in node_list{
-            let line = node.get_text_description();
-            file.write(line.as_bytes()).unwrap();
-            file.write("\n".as_bytes()).unwrap();
+        let mut first_line = true;
+        for node in node_list{           
+            if !first_line{
+                file.write("\n".as_bytes()).unwrap();
+            } else { first_line = false; }
+            let line = node.get_text_description();         
+            file.write(line.as_bytes()).unwrap();         
         }
     }
 

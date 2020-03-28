@@ -11,6 +11,12 @@ use crate::raytraceable::*;
 use crate::scene::*;
 
 fn main() {
+    let mut tree = KDTree::new(0);
+    tree.load(
+        &"C:\\Users\\mertw\\Dropbox\\stanford-dragon.obj".to_string(), 
+        &"C:\\Users\\mertw\\Desktop\\Pathtracing\\rust_path_tracing\\tree.txt".to_string()
+    );
+
     let camera = Camera {
         width: 1920,
         height: 1080,

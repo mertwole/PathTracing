@@ -1,15 +1,12 @@
-mod aabb;
-mod obj_loader;
-mod tree;
-mod triangle;
-mod vec3;
+extern crate kd_tree_lib;
 
-use crate::tree::*;
+use kd_tree_lib::tree::*;
 
 fn main() {
     let mut tree = Tree::new();
 
-    load_triangles_from_files(&mut tree);
+    let path = ask_path();
+    tree.load_triangles(&path);
 
     let depth = ask_depth();
     tree.build(depth);
@@ -24,15 +21,9 @@ fn ask_depth() -> u32 {
     input.trim().parse().unwrap()
 }
 
-fn load_triangles_from_files(tree: &mut Tree) {
-    println!("how much files?");
+fn ask_path() -> String {
+    println!("enter file name :");
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
-    let num_files: usize = input.trim().parse().unwrap();
-    println!("enter file names :");
-    for _i in 0..num_files {
-        input = String::new();
-        std::io::stdin().read_line(&mut input).unwrap();
-        tree.load_triangles(&input[0..input.len() - 2].to_string());
-    }
+    input[0..input.len() - 2].to_string()
 }
