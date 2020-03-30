@@ -1,5 +1,29 @@
 use std::ops;
 
+pub struct Math { }
+
+impl Math{
+    pub fn small_enought(x : f32) -> bool {
+        x < std::f32::EPSILON * 10.0 && x > -std::f32::EPSILON * 10.0
+    }
+
+    pub fn min(a : f32, b : f32) -> f32 {
+        if a < b { a } else { b } 
+    }
+
+    pub fn max(a : f32, b : f32) -> f32 {
+        if a > b { a } else { b } 
+    }
+
+    pub fn min_triple(a : f32, b : f32, c : f32) -> f32{
+        Math::min(a, Math::min(b, c))
+    }
+
+    pub fn max_triple(a : f32, b : f32, c : f32) -> f32{
+        Math::max(a, Math::max(b, c))
+    }
+}
+
 // region Vec2
 pub struct Vec2 {
     pub x: f32,

@@ -4,17 +4,17 @@
 name = "build_kd_tree"
 version = "0.1.0"
 dependencies = [
- "kd_tree_lib 0.1.0",
+ "kd_tree 0.1.0",
 ]
 
 [[package]]
-name = "kd_tree_lib"
+name = "kd_tree"
 version = "0.1.0"
 dependencies = [
- "math_lib 0.1.0",
+ "math 0.1.0",
 ]
 
 [[package]]
-name = "math_lib"
+name = "math"
 version = "0.1.0"
 

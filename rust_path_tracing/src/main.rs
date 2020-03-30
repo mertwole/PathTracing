@@ -1,22 +1,18 @@
+extern crate kd_tree;
+extern crate math;
+
 mod camera;
 mod material;
-mod math;
 mod raytraceable;
 mod ray;
 mod scene;
 use crate::camera::*;
 use crate::material::Material;
-use crate::math::*;
 use crate::raytraceable::*;
 use crate::scene::*;
+use crate::math::*;
 
 fn main() {
-    let mut tree = KDTree::new(0);
-    tree.load(
-        &"C:\\Users\\mertw\\Dropbox\\stanford-dragon.obj".to_string(), 
-        &"C:\\Users\\mertw\\Desktop\\Pathtracing\\rust_path_tracing\\tree.txt".to_string()
-    );
-
     let camera = Camera {
         width: 1920,
         height: 1080,

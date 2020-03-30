@@ -1,5 +1,4 @@
-extern crate math_lib;
-use math_lib::Vec3;
+use math::Vec3;
 
 pub struct AABB {
     pub min: Vec3,

@@ -1,6 +1,6 @@
-extern crate kd_tree_lib;
+extern crate kd_tree;
 
-use kd_tree_lib::tree::*;
+use kd_tree::tree::*;
 
 fn main() {
     let mut tree = Tree::new();

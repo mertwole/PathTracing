@@ -1,7 +1,5 @@
 use crate::aabb::*;
-
-extern crate math_lib;
-use math_lib::Vec3;
+use math::Vec3;
 
 pub struct Triangle {
     pub points: [Vec3; 3],

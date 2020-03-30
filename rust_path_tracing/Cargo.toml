@@ -9,4 +9,5 @@ edition = "2018"
 [dependencies]
 image = "*"
 rand = "*"
-kd_tree_lib = { path = "../kd_tree_lib" }
+kd_tree = { path = "../kd_tree" }
+math = { path = "../math" }
