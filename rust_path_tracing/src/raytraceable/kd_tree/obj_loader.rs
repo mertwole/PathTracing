@@ -15,31 +15,37 @@ impl OBJLoader {
     fn load_triangles(path: &String, out_triangles: &mut Vec<Triangle>) {
         let reader = BufReader::new(File::open(path.as_str()).unwrap());
         let verts = OBJLoader::load_verts(reader);
-        let reader = BufReader::new(File::open(path.as_str()).unwrap());
 
+        let reader = BufReader::new(File::open(path.as_str()).unwrap());
+        let normals = OBJLoader::load_normals(reader);
+
+        let reader = BufReader::new(File::open(path.as_str()).unwrap());
         for line in reader.lines() {
             let line = line.unwrap();
             if line.len() < 2 {
                 continue;
             }
             if line.chars().nth(0).unwrap() == 'f' && line.chars().nth(1).unwrap() == ' ' {
-                let ids: String = line.chars().into_iter().skip(2).collect();
-                let mut ids_iter = ids.split_whitespace();
+                let face_descr: String = line.chars().into_iter().skip(2).collect();
+                let mut face_descr_iter = face_descr.split_whitespace();
 
-                fn get_first_num(line: &str) -> usize {
-                    line.split("/").next().unwrap().parse::<usize>().unwrap()
-                }
-
-                let mut ids: [usize; 3] = [0, 0, 0];
+                let mut vert_ids: [usize; 3] = [0, 0, 0];
+                let mut normal_ids: [usize; 3] = [0, 0, 0];
                 for i in 0..3 {
-                    ids[i] = get_first_num(ids_iter.next().unwrap());
+                    let ids_line = face_descr_iter.next().unwrap();
+                    let mut ids_iter = ids_line.split("/");
+                    // Vert
+                    vert_ids[i] = ids_iter.next().unwrap().parse::<usize>().unwrap();
+                    // Tex
+                    ids_iter.next().unwrap();
+                    // Norm
+                    normal_ids[i] = ids_iter.next().unwrap().parse::<usize>().unwrap();
                 }
                 let new_tr_points = [
-                    verts[ids[0] - 1].clone(),
-                    verts[ids[1] - 1].clone(),
-                    verts[ids[2] - 1].clone()];
-                let new_tr_normal = (&new_tr_points[0] - &new_tr_points[1]).cross(&(&new_tr_points[2] - &new_tr_points[1]));
-                // TODO : get normal from file
+                    verts[vert_ids[0] - 1].clone(),
+                    verts[vert_ids[1] - 1].clone(),
+                    verts[vert_ids[2] - 1].clone()];
+                let new_tr_normal = normals[normal_ids[0] - 1];
                 let new_tr = Triangle::new(new_tr_points, new_tr_normal, 0);
                 out_triangles.push(new_tr);
             }
@@ -55,22 +61,43 @@ impl OBJLoader {
                 continue;
             }
             if line.chars().nth(0).unwrap() == 'v' && line.chars().nth(1).unwrap() == ' ' {
-                let coords: String = line.chars().into_iter().skip(2).collect();
-                let mut coords_iter = coords.split_whitespace();
-                let x = coords_iter.next().unwrap().parse::<f32>().unwrap();
-                let y = coords_iter.next().unwrap().parse::<f32>().unwrap();
-                let z = coords_iter.next().unwrap().parse::<f32>().unwrap();
-                let mut vert = Vec3::new(x, y, z);
-                match coords_iter.next() {
-                    Some(w) => {
-                        vert = &vert / w.parse::<f32>().unwrap();
-                    }
-                    _ => {}
-                }
-                verts.push(vert);
+                let coords: String = line.chars().into_iter().skip(2).collect();      
+                verts.push(OBJLoader::parse_vec3(&coords));
             }
         }
 
         verts
+    }
+
+    fn load_normals(reader: std::io::BufReader<std::fs::File>) -> Vec<Vec3> {
+        let mut normals: Vec<Vec3> = Vec::new();
+
+        for line in reader.lines() {
+            let line = line.unwrap();
+            if line.len() < 2 {
+                continue;
+            }
+            if line.chars().nth(0).unwrap() == 'v' && line.chars().nth(1).unwrap() == 'n' {
+                let coords: String = line.chars().into_iter().skip(3).collect();      
+                normals.push(OBJLoader::parse_vec3(&coords).normalized());
+            }
+        }
+
+        normals
+    }
+
+    fn parse_vec3(line : &String) -> Vec3{
+        let mut coords_iter = line.split_whitespace();
+        let x = coords_iter.next().unwrap().parse::<f32>().unwrap();
+        let y = coords_iter.next().unwrap().parse::<f32>().unwrap();
+        let z = coords_iter.next().unwrap().parse::<f32>().unwrap();
+        let mut point = Vec3::new(x, y, z);
+        match coords_iter.next() {
+            Some(w) => {
+                point = &point / w.parse::<f32>().unwrap();
+            }
+            _ => {}
+        }
+        point
     }
 }

@@ -111,7 +111,7 @@ impl Scene {
             let new_ray = Ray::new(
                 trace_result.point,
                 ray.direction.reflect(&trace_result.normal),
-                std::f32::EPSILON,
+                math::EPSILON,
                 std::f32::MAX,
             );
             self.get_color(&new_ray, max_depth - 1)
@@ -137,7 +137,7 @@ impl Scene {
             let new_ray = Ray::new(
                 trace_result.point,
                 new_direction,
-                std::f32::EPSILON,
+                math::EPSILON,
                 std::f32::MAX,
             );
             let new_color = &material.color.clone();
@@ -148,13 +148,13 @@ impl Scene {
     }
 
     pub fn iteration(&mut self) {
+        let inv_iter = 1.0 / (self.iteration as f32 + 1.0);
         for x in 0..self.camera.width {
             for y in 0..self.camera.height {
-                let color = self.get_color(&self.camera.get_ray(x, y), 8);
+                let color = self.get_color(&self.camera.get_ray(x, y), 16);
                 let pixel = self.image.get_pixel_mut(x, y);
-                let mut new_color = &(&*pixel * self.iteration as f32) + &color;
-                new_color = &new_color / (self.iteration as f32 + 1.0);
-                *pixel = new_color;
+                let new_color = &(&*pixel * self.iteration as f32) + &color;
+                *pixel = &new_color * inv_iter;
             }
 
             println!("iteration : {} x : {}", self.iteration, x);

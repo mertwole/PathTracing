@@ -25,7 +25,7 @@ impl Raytraceable for Triangle {
         let determinant = edge0.dot(&pvec);
         // If determinant < 0 => ray is tracing from the back side of triangle
         // Ray is parallel to triangle plane
-        if determinant < std::f32::EPSILON * 10.0 && determinant > std::f32::EPSILON * -10.0 { return result; }
+        if determinant < math::EPSILON && determinant > -math::EPSILON { return result; }
         let inv_determinant = 1.0 / determinant;
         let tvec = &ray.source - &self.points[0];
         let u = tvec.dot(&pvec) * inv_determinant;
