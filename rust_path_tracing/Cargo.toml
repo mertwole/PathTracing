@@ -9,5 +9,6 @@ edition = "2018"
 [dependencies]
 image = "*"
 rand = "*"
+num_cpus = "*"
 kd_tree = { path = "../kd_tree" }
 math = { path = "../math" }
