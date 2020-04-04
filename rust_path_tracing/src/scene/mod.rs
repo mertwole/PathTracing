@@ -17,7 +17,7 @@ pub struct Scene {
     workgroup_height : usize,
 
 
-    iteration: usize,
+    iterations: usize,
 
     primitives: Vec<Box<dyn Raytraceable>>,
     materials: Vec<Box<dyn Material>>,
@@ -33,7 +33,7 @@ impl Scene {
             trace_depth : 8,
             workgroup_width : 32,
             workgroup_height : 32,
-            iteration: 0usize,
+            iterations: 0usize,
             primitives: Vec::new(),
             materials: Vec::new(),
             workgroups : Vec::new()
@@ -105,17 +105,16 @@ impl Scene {
     }
 
     pub fn iterations(&mut self, num_iterations : usize) {
+        self.iterations = num_iterations;
         let mut workgroups = self.bring_to_workgroups();      
         // TODO : multithreading
         for i in 0..num_iterations{
-            let mut workgroup_id = 0;
             for workgroup_column in &mut workgroups{
                 for workgroup in workgroup_column{
-                    workgroup.iteration(self, self.trace_depth);
-                    println!("iter : {} wg id : {}", i, workgroup_id);
-                    workgroup_id += 1;
+                    workgroup.iteration(self, self.trace_depth);          
                 }
             }
+            println!("iter : {} ", i);
         }
 
         self.workgroups = workgroups;
@@ -124,6 +123,7 @@ impl Scene {
     pub fn save_output(&self, path: &std::path::Path) {
         let mut buffer: Vec<u8> = vec![0; self.camera.width * self.camera.height * 3];
         
+        let inv_iteration = 1.0 / (self.iterations as f32);
         for x in 0..self.workgroups.len(){
             for y in 0..self.workgroups[0].len(){
                 let offset_x = x * self.workgroup_width;
@@ -132,11 +132,15 @@ impl Scene {
                 let workgroup = &self.workgroups[x][y];
                 for img_x in 0..workgroup.buffer.width{
                     for img_y in 0..workgroup.buffer.height{
-                        let glob_pixel_id = offset_x + img_x + (offset_y + img_y) * self.camera.width;
+                        // Flip Y
+                        let glob_pixel_id = offset_x + img_x + (self.camera.height - 1 - (offset_y + img_y)) * self.camera.width;
                         let pixel = workgroup.buffer.get_pixel(img_x, img_y);
-                        buffer[glob_pixel_id * 3] =     (pixel.x.powf(1.0 / 2.2) * 255f32) as u8;
-                        buffer[glob_pixel_id * 3 + 1] = (pixel.y.powf(1.0 / 2.2) * 255f32) as u8;
-                        buffer[glob_pixel_id * 3 + 2] = (pixel.z.powf(1.0 / 2.2) * 255f32) as u8;
+                        let x = (inv_iteration * pixel.x).powf(1.0 / 2.2);
+                        let y = (inv_iteration * pixel.y).powf(1.0 / 2.2);
+                        let z = (inv_iteration * pixel.z).powf(1.0 / 2.2);
+                        buffer[glob_pixel_id * 3] =     (x * 255f32) as u8;
+                        buffer[glob_pixel_id * 3 + 1] = (y * 255f32) as u8;
+                        buffer[glob_pixel_id * 3 + 2] = (z * 255f32) as u8;
                     }
                 }
             }

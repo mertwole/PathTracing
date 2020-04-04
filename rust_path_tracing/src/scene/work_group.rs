@@ -58,15 +58,13 @@ impl WorkGroup{
     }
 
     pub fn iteration(&mut self, scene : &Scene, trace_depth : usize) {
-        let inv_iter = 1.0 / (self.iteration as f32 + 1.0);
         for x in 0..self.buffer.width {
             for y in 0..self.buffer.height {
                 let color = self.get_color(scene, &scene.camera.get_ray(self.x_offset + x, self.y_offset + y), trace_depth);
                 let pixel = self.buffer.get_pixel_mut(x, y);
-                let new_color = &(&*pixel * self.iteration as f32) + &color;
-                *pixel = &new_color * inv_iter;
+                *pixel = &*pixel + &color;
             }
         }
-
+        self.iteration += 1;
     }
 }

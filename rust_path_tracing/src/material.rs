@@ -35,10 +35,6 @@ impl BaseMaterial{
     }
 }
 
-pub struct PBRMaterial{
-
-}
-
 impl Material for BaseMaterial {
     fn get_color(&self, dir : &Vec3, normal : &Vec3, rng : &mut rand::prelude::ThreadRng) -> GetColorResult{
         let random_num = rng.gen_range(0.0, 1.0);
@@ -67,5 +63,71 @@ impl Material for BaseMaterial {
             return GetColorResult
             ::NextRayColorMultiplierAndDirection(self.color.clone(), new_direction);
         };
+    }
+}
+
+pub struct PBRMaterial{
+    albedo : Vec3,
+    roughness : f32,
+    metallic : f32,
+    // Precomputed
+    fresnel_k : Vec3,
+    roughness_sqr : f32
+}
+
+impl PBRMaterial{
+    pub fn new(albedo : Vec3, roughness : f32, metallic : f32) -> PBRMaterial{
+        PBRMaterial {
+            fresnel_k : &(&albedo * metallic) + &(&Vec3::new_xyz(0.04) * (1.0 - metallic)), 
+            roughness_sqr : roughness * roughness,
+            albedo,
+            roughness,
+            metallic,         
+        }
+    }
+
+    fn fresnel(&self, nl : f32) -> Vec3{
+        &self.fresnel_k + &(&(&Vec3::new_xyz(1.0) - &self.fresnel_k) * (1.0 - nl).powi(5))
+    }
+
+    fn ggx_microfacet_distribution(&self, nh : f32) -> f32{
+        let nh_sqr = nh * nh;
+        let denominator_sqrt = 1.0 - nh_sqr * (1.0 - self.roughness_sqr);
+        self.roughness_sqr * math::INV_PI / (denominator_sqrt * denominator_sqrt)
+    }
+
+    fn ggx_selfshadowing(&self, angle_cos : f32) -> f32{
+        let cos_sqr = angle_cos * angle_cos;
+        2.0 / (1.0 + (1.0 + self.roughness_sqr * ((1.0 - cos_sqr) / cos_sqr)).sqrt())
+    }
+}
+
+impl Material for PBRMaterial{
+    fn get_color(&self, dir : &Vec3, normal : &Vec3, rng : &mut rand::prelude::ThreadRng) -> GetColorResult{
+        let mut v = Vec3::new(
+            rng.gen_range(-1.0, 1.0),
+            rng.gen_range(-1.0, 1.0),
+            rng.gen_range(-1.0, 1.0),
+        ).normalized();
+        if v.dot(&normal) < 0.0 { v = &Vec3::zero() - &v; }
+        
+        let l = &Vec3::zero() - &dir;
+        let nl = normal.dot(&l);
+        let nv = normal.dot(&v);
+        let h = (&v + &l).normalized();
+        let specular = self.fresnel(nl);
+        let mut color = Vec3::zero();
+        // Specular
+        color = &color + &(&specular * (
+        self.ggx_microfacet_distribution(normal.dot(&h)) * 
+        self.ggx_selfshadowing(nl) *
+        self.ggx_selfshadowing(nv) / (4.0 * nv)));
+        // Diffuse
+        color = &color + &(&(&Vec3::new_xyz(1.0) - &specular) * &(&self.albedo * ((1.0 - self.metallic) * nl * math::INV_PI)));
+        
+        color = &color * math::PI;
+
+        return GetColorResult
+        ::NextRayColorMultiplierAndDirection(color, v);
     }
 }
