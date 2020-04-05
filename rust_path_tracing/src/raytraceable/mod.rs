@@ -9,6 +9,8 @@ pub use triangle::*;
 pub mod kd_tree;
 pub use self::kd_tree::*;
 
-pub trait Raytraceable {
+use std::marker::{Send, Sync};
+
+pub trait Raytraceable : Send + Sync {
     fn trace_ray(&self, ray: &Ray) -> RayTraceResult;
 }

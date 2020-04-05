@@ -1,15 +1,14 @@
 use crate::math::Vec3;
-
-extern crate rand;
-use rand::Rng;
+use crate::rand::*;
+use std::marker::{Send, Sync};
 
 pub enum GetColorResult{
     Color(Vec3),
     NextRayColorMultiplierAndDirection(Vec3, Vec3)
 }
 
-pub trait Material {
-    fn get_color(&self, dir : &Vec3, normal : &Vec3, rng : &mut rand::prelude::ThreadRng) -> GetColorResult;
+pub trait Material : Send + Sync {
+    fn get_color(&self, dir : &Vec3, normal : &Vec3) -> GetColorResult;
 }
 
 pub struct BaseMaterial {
@@ -36,7 +35,8 @@ impl BaseMaterial{
 }
 
 impl Material for BaseMaterial {
-    fn get_color(&self, dir : &Vec3, normal : &Vec3, rng : &mut rand::prelude::ThreadRng) -> GetColorResult{
+    fn get_color(&self, dir : &Vec3, normal : &Vec3) -> GetColorResult{
+        let mut rng = rand::prelude::thread_rng();
         let random_num = rng.gen_range(0.0, 1.0);
         if random_num < self.reflective {
             // reflect
@@ -103,7 +103,8 @@ impl PBRMaterial{
 }
 
 impl Material for PBRMaterial{
-    fn get_color(&self, dir : &Vec3, normal : &Vec3, rng : &mut rand::prelude::ThreadRng) -> GetColorResult{
+    fn get_color(&self, dir : &Vec3, normal : &Vec3) -> GetColorResult{
+        let mut rng = rand::prelude::thread_rng();
         let mut v = Vec3::new(
             rng.gen_range(-1.0, 1.0),
             rng.gen_range(-1.0, 1.0),

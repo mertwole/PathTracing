@@ -10,5 +10,6 @@ edition = "2018"
 image = "*"
 rand = "*"
 num_cpus = "*"
+threadpool = "*"
 kd_tree = { path = "../kd_tree" }
 math = { path = "../math" }

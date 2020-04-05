@@ -28,6 +28,105 @@ impl Math{
     }
 }
 
+// region UVec2 
+pub struct UVec2{
+    pub x : usize,
+    pub y : usize
+}
+
+impl UVec2{
+    pub fn new(x : usize, y : usize) -> UVec2{
+        UVec2 { x, y }
+    }
+
+    pub fn zero() -> UVec2{
+        UVec2 { x : 0, y : 0 }
+    }
+
+    pub fn clone(&self) -> UVec2{
+        UVec2 { x : self.x, y : self.y }
+    }
+}
+
+impl ops::Add<&UVec2> for &UVec2 {
+    type Output = UVec2;
+    fn add(self, rhs: &UVec2) -> UVec2 {
+        UVec2::new(self.x + rhs.x, self.y + rhs.y)
+    }
+}
+
+impl ops::Sub<&UVec2> for &UVec2 {
+    type Output = UVec2;
+    fn sub(self, rhs: &UVec2) -> UVec2 {
+        UVec2::new(self.x - rhs.x, self.y - rhs.y)
+    }
+}
+
+impl ops::Mul<&UVec2> for &UVec2 {
+    type Output = UVec2;
+    fn mul(self, rhs: &UVec2) -> UVec2 {
+        UVec2::new(self.x * rhs.x, self.y * rhs.y)
+    }
+}
+
+impl ops::Mul<usize> for &UVec2 {
+    type Output = UVec2;
+    fn mul(self, rhs: usize) -> UVec2 {
+        UVec2::new(self.x * rhs, self.y * rhs)
+    }
+}
+
+impl ops::Mul<&UVec2> for usize {
+    type Output = UVec2;
+    fn mul(self, rhs: &UVec2) -> UVec2 {
+        rhs * self
+    }
+}
+
+impl ops::Div<&UVec2> for &UVec2 {
+    type Output = UVec2;
+    fn div(self, rhs: &UVec2) -> UVec2 {
+        UVec2::new(self.x / rhs.x, self.y / rhs.y)
+    }
+}
+
+impl ops::Div<usize> for &UVec2 {
+    type Output = UVec2;
+    fn div(self, rhs: usize) -> UVec2 {
+        UVec2::new(self.x / rhs, self.y / rhs)
+    }
+}
+
+// endregion
+
+// region Color
+
+pub struct Color24bpprgb{
+    pub r : u8,
+    pub g : u8,
+    pub b : u8
+}
+
+impl Color24bpprgb{
+    pub fn new(r : u8, g : u8, b : u8) -> Color24bpprgb{
+        Color24bpprgb { r, g, b }
+    }
+
+    pub fn from_normalized(r : f32, g : f32, b : f32) -> Color24bpprgb{
+        Color24bpprgb { r : (r * 255.0) as u8, g : (g * 255.0) as u8, b : (b * 255.0) as u8 }
+    }
+
+    pub fn zero() -> Color24bpprgb{
+        Color24bpprgb { r : 0, g : 0, b : 0 }
+    }
+
+    pub fn clone(&self) -> Color24bpprgb{
+        Color24bpprgb { r : self.r, g : self.g, b : self.b }
+    }
+}
+
+// endregion
+
 // region Vec2
 pub struct Vec2 {
     pub x: f32,

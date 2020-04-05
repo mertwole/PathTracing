@@ -1,43 +1,47 @@
 use crate::camera::*;
 use crate::material::*;
 use crate::raytraceable::*;
+use crate::math::*;
 
 mod work_group;
 use work_group::*;
 mod image_buffer;
 
-extern crate image;
 extern crate num_cpus;
+extern crate threadpool;
+
+use threadpool::ThreadPool;
+use std::sync::mpsc::channel;
 
 pub struct Scene {
     camera: Camera,
     num_threads : usize,
     trace_depth : usize,
-    workgroup_width : usize,
-    workgroup_height : usize,
-
-
-    iterations: usize,
+    workgroup_size : UVec2,
+    workgroup_count : UVec2,
 
     primitives: Vec<Box<dyn Raytraceable>>,
     materials: Vec<Box<dyn Material>>,
 
-    workgroups : Vec<Vec<WorkGroup>>
+    workgroups : Vec<WorkGroup>
 }
+
+static mut GLOBAL_SCENE_PTR : *const Scene = std::ptr::null();
 
 impl Scene {
     pub fn new(camera: Camera) -> Scene {
-        Scene {
+        let scene = Scene {
             camera,
             num_threads : num_cpus::get_physical(),
             trace_depth : 8,
-            workgroup_width : 32,
-            workgroup_height : 32,
-            iterations: 0usize,
+            workgroup_count : UVec2::new(0, 0),
+            workgroup_size : UVec2::new(32, 32),
             primitives: Vec::new(),
             materials: Vec::new(),
             workgroups : Vec::new()
-        }
+        };
+
+        scene
     }
 
     // region getters and setters
@@ -50,9 +54,8 @@ impl Scene {
         self.materials = materials;
     }
 
-    pub fn set_workgroup_size(&mut self, workgroup_width : usize, workgroup_height : usize){
-        self.workgroup_width = workgroup_width;
-        self.workgroup_height = workgroup_height;
+    pub fn set_workgroup_size(&mut self, width : usize, height : usize){
+        self.workgroup_size = UVec2::new(width, height);
     }
 
     pub fn set_num_threads(&mut self, num_threads : usize) { 
@@ -65,82 +68,98 @@ impl Scene {
 
     // endregion
 
-    fn bring_to_workgroups(&mut self) -> Vec<Vec<WorkGroup>>{
-        let mut workgroups : Vec<Vec<WorkGroup>> = Vec::new();
+    fn bring_to_workgroups(&mut self) -> Vec<WorkGroup>{
+        let mut workgroups : Vec<WorkGroup> = Vec::new();
 
-        let num_workgroups_x = self.camera.width / self.workgroup_width;
-        let num_workgroups_y = self.camera.height / self.workgroup_height;
-        let remainder_width = self.camera.width - num_workgroups_x * self.workgroup_width;
-        let remainder_height = self.camera.height - num_workgroups_y * self.workgroup_height;
+        // Number of full-widthed and full-heighted workgroups
+        self.workgroup_count = &self.camera.resolution / &self.workgroup_size;
+        let remainder = &self.camera.resolution - &(&self.workgroup_count * &self.workgroup_size);
+        if remainder.x != 0{ self.workgroup_count.x += 1; }
+        if remainder.y != 0{ self.workgroup_count.y += 1; }
 
-        workgroups.reserve(num_workgroups_y);
-
-        for column_id in 0..num_workgroups_x + 1{ 
-            let mut column_width = self.workgroup_width;
-            if column_id == num_workgroups_x {
-                if remainder_width == 0 { break; } else { column_width = remainder_width; }
+        workgroups.reserve(self.workgroup_count.x * self.workgroup_count.y);
+        
+        for row_id in 0..self.workgroup_count.y{              
+            let mut row_height = self.workgroup_size.y;
+            // Last row can be not full-heighted
+            if row_id == self.workgroup_count.y && remainder.y != 0 {
+                row_height = remainder.y; 
             }
 
-            let mut workgroup_column : Vec<WorkGroup> = Vec::new();
-            workgroup_column.reserve(num_workgroups_x);
+            for column_id in 0..self.workgroup_count.x{ 
 
-            for row_id in 0..num_workgroups_y + 1{
-                let mut row_height = self.workgroup_height;
-                if row_id == num_workgroups_y {
-                    if remainder_height == 0 { break; } else { row_height = remainder_height; }
+                let mut column_width = self.workgroup_size.x;
+                // Last column can be not full-widthed
+                if column_id == self.workgroup_count.x && remainder.x != 0 {
+                    column_width = remainder.x; 
                 }
 
                 let workgroup = WorkGroup::new(
-                    column_id * self.workgroup_width, 
-                    row_id * self.workgroup_height, 
+                    column_id * self.workgroup_size.x, 
+                    row_id * self.workgroup_size.y, 
                     column_width, 
                     row_height
                 );
-                workgroup_column.push(workgroup);
+
+                workgroups.push(workgroup);
             }
-            workgroups.push(workgroup_column);
         }
-        
+          
         workgroups
     }
 
     pub fn iterations(&mut self, num_iterations : usize) {
-        self.iterations = num_iterations;
-        let mut workgroups = self.bring_to_workgroups();      
-        // TODO : multithreading
-        for i in 0..num_iterations{
-            for workgroup_column in &mut workgroups{
-                for workgroup in workgroup_column{
-                    workgroup.iteration(self, self.trace_depth);          
-                }
-            }
-            println!("iter : {} ", i);
-        }
+        self.workgroups = self.bring_to_workgroups();     
+        
+        let (tx, rx) : (std::sync::mpsc::Sender<(WorkGroup, usize)>, std::sync::mpsc::Receiver<(WorkGroup, usize)>) = channel(); 
+        let pool = ThreadPool::new(self.num_threads);
 
-        self.workgroups = workgroups;
+        unsafe { GLOBAL_SCENE_PTR = self; }
+
+        for _ in 0..num_iterations{           
+            let mut workgroups_received : Vec<Option<WorkGroup>> = Vec::new();
+            for _ in 0..self.workgroup_count.x * self.workgroup_count.y{
+                workgroups_received.push(None);
+            }
+
+            for i in 0..self.workgroup_count.x * self.workgroup_count.y{
+                let tx_ = tx.clone();
+                let mut workgroup = self.workgroups.remove(0);
+                let trace_depth = self.trace_depth;
+                pool.execute(move || {
+                    unsafe{ workgroup.iteration(GLOBAL_SCENE_PTR.as_ref().unwrap(), trace_depth); }
+                    tx_.send((workgroup, i)).unwrap();
+                });
+            }
+            for _ in 0..self.workgroup_count.x * self.workgroup_count.y{
+                let (workgroup, id) = rx.recv().unwrap();    
+                workgroups_received[id] = Some(workgroup);
+            }
+            for workgroup in workgroups_received{
+                self.workgroups.push(workgroup.ok_or("").unwrap());
+            }
+        }
+        pool.join();
     }
 
     pub fn save_output(&self, path: &std::path::Path) {
-        let mut buffer: Vec<u8> = vec![0; self.camera.width * self.camera.height * 3];
-        
-        let inv_iteration = 1.0 / (self.iterations as f32);
-        for x in 0..self.workgroups.len(){
-            for y in 0..self.workgroups[0].len(){
-                let offset_x = x * self.workgroup_width;
-                let offset_y = y * self.workgroup_height;
+        let mut buffer: Vec<u8> = vec![0u8; self.camera.resolution.x * self.camera.resolution.y * 3];  
 
-                let workgroup = &self.workgroups[x][y];
-                for img_x in 0..workgroup.buffer.width{
-                    for img_y in 0..workgroup.buffer.height{
-                        // Flip Y
-                        let glob_pixel_id = offset_x + img_x + (self.camera.height - 1 - (offset_y + img_y)) * self.camera.width;
-                        let pixel = workgroup.buffer.get_pixel(img_x, img_y);
-                        let x = (inv_iteration * pixel.x).powf(1.0 / 2.2);
-                        let y = (inv_iteration * pixel.y).powf(1.0 / 2.2);
-                        let z = (inv_iteration * pixel.z).powf(1.0 / 2.2);
-                        buffer[glob_pixel_id * 3] =     (x * 255f32) as u8;
-                        buffer[glob_pixel_id * 3 + 1] = (y * 255f32) as u8;
-                        buffer[glob_pixel_id * 3 + 2] = (z * 255f32) as u8;
+        for x in 0..self.workgroup_count.x{
+            for y in 0..self.workgroup_count.y{
+                let workgroup_buffer = self.workgroups[x + y * self.workgroup_count.x].get_raw_image_data();
+
+                for buf_x in 0..workgroup_buffer.len(){
+                    for buf_y in 0..workgroup_buffer[0].len(){
+                        let buf_pixel = workgroup_buffer[buf_x][buf_y].clone();
+                        let glob_x = x * self.workgroup_size.x + buf_x;
+                        let mut glob_y = y * self.workgroup_size.y + buf_y;
+                        glob_y = self.camera.resolution.y - glob_y - 1;
+                        let glob_adress = glob_x + glob_y * self.camera.resolution.x;
+
+                        buffer[glob_adress * 3 + 0] = buf_pixel.r;
+                        buffer[glob_adress * 3 + 1] = buf_pixel.g;
+                        buffer[glob_adress * 3 + 2] = buf_pixel.b;
                     }
                 }
             }
@@ -149,8 +168,8 @@ impl Scene {
         image::save_buffer_with_format(
             path,
             &buffer,
-            self.camera.width as u32,
-            self.camera.height as u32,
+            self.camera.resolution.x as u32,
+            self.camera.resolution.y as u32,
             image::ColorType::Rgb8,
             image::ImageFormat::Bmp,
         ).unwrap();
