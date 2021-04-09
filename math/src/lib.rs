@@ -1,6 +1,6 @@
 use std::ops;
 
-pub const EPSILON : f32 = 0.00001;
+pub const EPSILON : f32 = 0.0001;
 pub const PI : f32 = 3.14159265359;
 pub const INV_PI : f32 = 0.31830988618;
 
@@ -279,6 +279,23 @@ impl Vec3 {
 
     pub fn reflect(&self, relative: &Vec3) -> Vec3 {
         self - &(2.0 * self.dot(relative) * relative)
+    }
+
+    pub fn refract(&self, normal : &Vec3, eta : f32) -> Option<Vec3> {
+        let dot = normal.dot(self);
+        let k = 1.0 - eta * eta * (1.0 - dot * dot);
+        if k < 0.0 { return None; }
+        Some(&(eta * self) - &(normal * (eta * dot + f32::sqrt(k))))
+    }
+
+    pub fn random_on_unit_sphere(rand_0 : f32, rand_1 : f32) -> Vec3 {
+        let theta = rand_0 * PI * 2.0;
+        let phi = f32::acos((2.0 * rand_1) - 1.0);
+        let x = f32::sin(phi) * f32::cos(theta);
+        let y = f32::sin(phi) * f32::sin(theta);
+        let z = f32::cos(phi);
+
+        Vec3::new(x, y, z)
     }
 }
 

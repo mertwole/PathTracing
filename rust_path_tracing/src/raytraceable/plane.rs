@@ -6,7 +6,7 @@ pub struct Plane {
     point: Vec3,
     normal: Vec3,
 
-    material_id: usize,
+    material_id: usize
 }
 
 impl Plane {

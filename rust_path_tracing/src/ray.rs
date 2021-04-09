@@ -6,6 +6,7 @@ pub struct RayTraceResult {
     pub normal: Vec3,
     pub t: f32,
     pub material_id: usize,
+    pub hit_inside: bool
 }
 
 impl RayTraceResult {
@@ -16,6 +17,7 @@ impl RayTraceResult {
             normal: Vec3::zero(),
             t: 0.0,
             material_id: 0,
+            hit_inside : false
         }
     }
 }

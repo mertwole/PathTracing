@@ -1,6 +1,7 @@
 use crate::math::Vec3;
 use crate::rand::*;
 use std::marker::{Send, Sync};
+use crate::ray::RayTraceResult;
 
 pub enum GetColorResult{
     Color(Vec3),
@@ -8,7 +9,7 @@ pub enum GetColorResult{
 }
 
 pub trait Material : Send + Sync {
-    fn get_color(&self, dir : &Vec3, normal : &Vec3) -> GetColorResult;
+    fn get_color(&self, dir : &Vec3, trace_result : &RayTraceResult) -> GetColorResult;
 }
 
 pub struct BaseMaterial {
@@ -35,28 +36,32 @@ impl BaseMaterial{
 }
 
 impl Material for BaseMaterial {
-    fn get_color(&self, dir : &Vec3, normal : &Vec3) -> GetColorResult{
-        let mut rng = rand::prelude::thread_rng();
-        let random_num = rng.gen_range(0.0, 1.0);
+    fn get_color(&self, dir : &Vec3, trace_result : &RayTraceResult) -> GetColorResult{
+        //let mut rng = rand::prelude::thread_rng();
+        let random_num = thread_rng().gen_range(0.0, 1.0);
         if random_num < self.reflective {
             // reflect
             return GetColorResult
-            ::NextRayColorMultiplierAndDirection(Vec3::new_xyz(1.0), dir.reflect(&normal));
+            ::NextRayColorMultiplierAndDirection(Vec3::new_xyz(1.0), dir.reflect(&trace_result.normal));
         } else if random_num < self.reflective + self.emissive {
             // emit
             return GetColorResult::Color(self.emission.clone());
         } else if random_num < self.reflective + self.emissive + self.refractive {
             // refract
-            return GetColorResult::Color(Vec3::zero());
-        // TODO
+            let a = if trace_result.hit_inside { -1.0 } else { 1.0 };
+            let refraction = if trace_result.hit_inside { self.refraction } else { 1.0 / self.refraction };
+            let new_dir = match dir.refract(&trace_result.normal, refraction) {
+                Some(direction) => { direction }
+                None => { dir.cross(&(&trace_result.normal * a)).cross(&(&trace_result.normal * a)).normalized() }
+            };
+
+            return GetColorResult
+            ::NextRayColorMultiplierAndDirection(Vec3::new_xyz(1.0), new_dir);
         } else {
             // diffuse
-            let mut new_direction = Vec3::new(
-                rng.gen_range(-1.0, 1.0),
-                rng.gen_range(-1.0, 1.0),
-                rng.gen_range(-1.0, 1.0),
-            ).normalized();
-            if new_direction.dot(&normal) < 0.0 {
+            let mut new_direction = Vec3::random_on_unit_sphere(thread_rng().gen_range(0.0, 1.0), thread_rng().gen_range(0.0, 1.0));
+
+            if new_direction.dot(&trace_result.normal) < 0.0 {
                 new_direction = &Vec3::zero() - &new_direction;
             }
 
@@ -103,24 +108,24 @@ impl PBRMaterial{
 }
 
 impl Material for PBRMaterial{
-    fn get_color(&self, dir : &Vec3, normal : &Vec3) -> GetColorResult{
+    fn get_color(&self, dir : &Vec3, trace_result : &RayTraceResult) -> GetColorResult{
         let mut rng = rand::prelude::thread_rng();
         let mut v = Vec3::new(
             rng.gen_range(-1.0, 1.0),
             rng.gen_range(-1.0, 1.0),
             rng.gen_range(-1.0, 1.0),
         ).normalized();
-        if v.dot(&normal) < 0.0 { v = &Vec3::zero() - &v; }
+        if v.dot(&trace_result.normal) < 0.0 { v = &Vec3::zero() - &v; }
         
         let l = &Vec3::zero() - &dir;
-        let nl = normal.dot(&l);
-        let nv = normal.dot(&v);
+        let nl = trace_result.normal.dot(&l);
+        let nv = trace_result.normal.dot(&v);
         let h = (&v + &l).normalized();
         let specular = self.fresnel(nl);
         let mut color = Vec3::zero();
         // Specular
         color = &color + &(&specular * (
-        self.ggx_microfacet_distribution(normal.dot(&h)) * 
+        self.ggx_microfacet_distribution(trace_result.normal.dot(&h)) * 
         self.ggx_selfshadowing(nl) *
         self.ggx_selfshadowing(nv) / (4.0 * nv)));
         // Diffuse

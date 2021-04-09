@@ -32,7 +32,7 @@ impl Scene {
     pub fn new(camera: Camera) -> Scene {
         let scene = Scene {
             camera,
-            num_threads : num_cpus::get_physical(),
+            num_threads : num_cpus::get(),
             trace_depth : 8,
             workgroup_count : UVec2::new(0, 0),
             workgroup_size : UVec2::new(32, 32),
@@ -68,8 +68,8 @@ impl Scene {
 
     // endregion
 
-    fn bring_to_workgroups(&mut self) -> Vec<WorkGroup>{
-        let mut workgroups : Vec<WorkGroup> = Vec::new();
+    fn divide_to_workgroups(&mut self) {
+        self.workgroups = Vec::new();
 
         // Number of full-widthed and full-heighted workgroups
         self.workgroup_count = &self.camera.resolution / &self.workgroup_size;
@@ -77,7 +77,7 @@ impl Scene {
         if remainder.x != 0{ self.workgroup_count.x += 1; }
         if remainder.y != 0{ self.workgroup_count.y += 1; }
 
-        workgroups.reserve(self.workgroup_count.x * self.workgroup_count.y);
+        self.workgroups.reserve(self.workgroup_count.x * self.workgroup_count.y);
         
         for row_id in 0..self.workgroup_count.y{              
             let mut row_height = self.workgroup_size.y;
@@ -101,22 +101,25 @@ impl Scene {
                     row_height
                 );
 
-                workgroups.push(workgroup);
+                self.workgroups.push(workgroup);
             }
         }
-          
-        workgroups
+    }
+
+    pub fn init(&mut self) {
+        self.divide_to_workgroups();
+        unsafe { GLOBAL_SCENE_PTR = self; }
     }
 
     pub fn iterations(&mut self, num_iterations : usize) {
-        self.workgroups = self.bring_to_workgroups();     
-        
+        unsafe {
+            if GLOBAL_SCENE_PTR == std::ptr::null() { panic!("scene is not initialized!"); }
+        }
+
         let (tx, rx) : (std::sync::mpsc::Sender<(WorkGroup, usize)>, std::sync::mpsc::Receiver<(WorkGroup, usize)>) = channel(); 
         let pool = ThreadPool::new(self.num_threads);
 
-        unsafe { GLOBAL_SCENE_PTR = self; }
-
-        for _ in 0..num_iterations{           
+        for i in 0..num_iterations{           
             let mut workgroups_received : Vec<Option<WorkGroup>> = Vec::new();
             for _ in 0..self.workgroup_count.x * self.workgroup_count.y{
                 workgroups_received.push(None);
@@ -139,7 +142,6 @@ impl Scene {
                 self.workgroups.push(workgroup.ok_or("").unwrap());
             }
         }
-        pool.join();
     }
 
     pub fn save_output(&self, path: &std::path::Path) {
@@ -173,5 +175,31 @@ impl Scene {
             image::ColorType::Rgb8,
             image::ImageFormat::Bmp,
         ).unwrap();
+    }
+
+    pub fn get_raw_image(&self) -> Vec<u32> {
+        let mut buffer: Vec<u32> = vec![0u32; self.camera.resolution.x * self.camera.resolution.y];  
+
+        for x in 0..self.workgroup_count.x{
+            for y in 0..self.workgroup_count.y{
+                let workgroup_buffer = self.workgroups[x + y * self.workgroup_count.x].get_raw_image_data();
+
+                for buf_x in 0..workgroup_buffer.len(){
+                    for buf_y in 0..workgroup_buffer[0].len(){
+                        let buf_pixel = workgroup_buffer[buf_x][buf_y].clone();
+                        let glob_x = x * self.workgroup_size.x + buf_x;
+                        let glob_y = y * self.workgroup_size.y + buf_y;
+                        let glob_adress = glob_x + glob_y * self.camera.resolution.x;
+
+                        buffer[glob_adress] = 
+                            (buf_pixel.r as u32) 
+                            + 256 * (buf_pixel.g as u32) 
+                            + 256 * 256 * (buf_pixel.b as u32);
+                    }
+                }
+            }
+        }
+
+        buffer
     }
 }

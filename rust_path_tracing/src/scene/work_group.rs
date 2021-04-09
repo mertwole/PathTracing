@@ -3,6 +3,7 @@ use super::image_buffer::*;
 use crate::ray::{Ray, RayTraceResult};
 use crate::math::*;
 use crate::material::*;
+use crate::rand::*;
 
 pub struct WorkGroup{
     iteration : usize,
@@ -43,21 +44,27 @@ impl WorkGroup{
         if !trace_result.hit { return Vec3::zero(); }
 
         let material = scene.materials[trace_result.material_id].as_ref();
-        let color_result = material.get_color(&ray.direction, &trace_result.normal);
+        let color_result = material.get_color(&ray.direction, &trace_result);
 
         match color_result{
             GetColorResult::Color(color) => { return color; }
             GetColorResult::NextRayColorMultiplierAndDirection(mul, dir) => { 
-                let new_ray = Ray::new(trace_result.point, dir, math::EPSILON, std::f32::MAX);
+                let ray_start = &trace_result.point + &(&dir * math::EPSILON);
+                let new_ray = Ray::new(ray_start, dir, math::EPSILON, std::f32::MAX);
                 return &mul * &self.get_color(scene, &new_ray, max_depth - 1) 
             }
         };
     }
 
     pub fn iteration(&mut self, scene : &Scene, trace_depth : usize) {
+        let mut rng = rand::prelude::thread_rng();
+
         for x in 0..self.buffer.width {
             for y in 0..self.buffer.height {
-                let color = self.get_color(scene, &scene.camera.get_ray(UVec2::new(self.x_offset + x, self.y_offset + y)), trace_depth);
+                let rand = Vec2::new(rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0));
+
+                let ray = &scene.camera.get_ray(UVec2::new(self.x_offset + x, self.y_offset + y), rand);
+                let color = self.get_color(scene, ray, trace_depth);
                 let pixel = self.buffer.get_pixel_mut(x, y);
                 *pixel = &*pixel + &color;
             }

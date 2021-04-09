@@ -38,17 +38,17 @@ impl Raytraceable for Sphere {
 
         if t2 >= ray.min && t2 <= ray.max {
             result.t = t2;
-        //result.normal_facing_outside = 1;
         } else if t1 >= ray.min && t1 <= ray.max {
             result.t = t1;
         //if we choose max value of t it means that ray is traced from inside
-        //result.normal_facing_outside = -1;
+            result.hit_inside = true;
         } else {
             return result;
         }
 
         result.point = &(result.t * &ray.direction) + &ray.source;
-        result.normal = &(&result.point - &self.center) / self.radius;
+        let normal_facing_outside = if result.hit_inside { -1.0 } else { 1.0 };
+        result.normal = &(&result.point - &self.center) / (self.radius * normal_facing_outside);
         result.hit = true;
         result.material_id = self.material_id;
 
