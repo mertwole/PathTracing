@@ -57,13 +57,9 @@ impl WorkGroup{
     }
 
     pub fn iteration(&mut self, scene : &Scene, trace_depth : usize) {
-        let mut rng = rand::prelude::thread_rng();
-
         for x in 0..self.buffer.width {
             for y in 0..self.buffer.height {
-                let rand = Vec2::new(rng.gen_range(0.0, 1.0), rng.gen_range(0.0, 1.0));
-
-                let ray = &scene.camera.get_ray(UVec2::new(self.x_offset + x, self.y_offset + y), rand);
+                let ray = &scene.camera.get_ray(UVec2::new(self.x_offset + x, self.y_offset + y));
                 let color = self.get_color(scene, ray, trace_depth);
                 let pixel = self.buffer.get_pixel_mut(x, y);
                 *pixel = &*pixel + &color;

@@ -48,11 +48,13 @@ impl Material for BaseMaterial {
             return GetColorResult::Color(self.emission.clone());
         } else if random_num < self.reflective + self.emissive + self.refractive {
             // refract
-            let a = if trace_result.hit_inside { -1.0 } else { 1.0 };
-            let refraction = if trace_result.hit_inside { self.refraction } else { 1.0 / self.refraction };
+            let refraction = if trace_result.hit_inside { 1.0 / self.refraction } else { self.refraction };
             let new_dir = match dir.refract(&trace_result.normal, refraction) {
                 Some(direction) => { direction }
-                None => { dir.cross(&(&trace_result.normal * a)).cross(&(&trace_result.normal * a)).normalized() }
+                None => { 
+                    let reflected = dir.reflect(&trace_result.normal);
+                    &reflected * if trace_result.hit_inside { 1.0 } else { -1.0 }
+                }
             };
 
             return GetColorResult

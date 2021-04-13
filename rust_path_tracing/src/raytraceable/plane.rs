@@ -11,7 +11,7 @@ pub struct Plane {
 
 impl Plane {
     pub fn new(point: Vec3, normal: Vec3, material_id: usize) -> Plane {
-        Plane { point, normal, material_id }
+        Plane { point, normal : normal.normalized(), material_id }
     }
 }
 

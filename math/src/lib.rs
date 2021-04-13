@@ -362,24 +362,42 @@ impl Mat3 {
         Mat3 { row0, row1, row2 }
     }
 
-    pub fn create_rotation(yaw: f32, pitch: f32, roll: f32) -> Mat3 {
-        let (yaw_s, yaw_c) = yaw.sin_cos();
-        let (pitch_s, pitch_c) = pitch.sin_cos();
-        let (roll_s, roll_c) = roll.sin_cos();
+    pub fn identity() -> Mat3 {
+        Mat3::new(
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0)
+        )
+    }
 
-        Mat3 {
-            row0: Vec3::new(
-                yaw_c * pitch_c,
-                yaw_s * roll_s - yaw_c * pitch_s * roll_c,
-                yaw_c * pitch_s * roll_s + yaw_s * roll_c,
-            ),
-            row1: Vec3::new(pitch_s, pitch_c * roll_c, -pitch_c * roll_s),
-            row2: Vec3::new(
-                -yaw_s * pitch_c,
-                yaw_s * pitch_s * roll_c + yaw_c * roll_s,
-                yaw_c * roll_c - yaw_s * pitch_s * roll_s,
-            ),
-        }
+    pub fn create_rotation_x(rotation : f32) -> Mat3 {
+        let (sin, cos) = f32::sin_cos(rotation);
+
+        Mat3::new(
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(0.0, cos, -sin),
+            Vec3::new(0.0, sin, cos)
+        )
+    }
+
+    pub fn create_rotation_y(rotation : f32) -> Mat3 {
+        let (sin, cos) = f32::sin_cos(rotation);
+
+        Mat3::new(
+            Vec3::new(cos, 0.0, sin),
+            Vec3::new(0.0, 1.0, 0.0),
+            Vec3::new(-sin, 0.0, cos)
+        )
+    }
+
+    pub fn create_rotation_z(rotation : f32) -> Mat3 {
+        let (sin, cos) = f32::sin_cos(rotation);
+
+        Mat3::new(
+            Vec3::new(cos, -sin, 0.0),
+            Vec3::new(sin, cos, 0.0),
+            Vec3::new(0.0, 0.0, 1.0)
+        )
     }
 }
 
@@ -393,5 +411,21 @@ impl ops::Mul<&Vec3> for &Mat3 {
         )
     }
 }
+
+impl ops::Mul<&Mat3> for &Mat3 {
+    type Output = Mat3;
+    fn mul(self, rhs: &Mat3) -> Mat3 {
+        let col0 = Vec3::new(rhs.row0.x, rhs.row1.x, rhs.row2.x);
+        let col1 = Vec3::new(rhs.row0.y, rhs.row1.y, rhs.row2.y);
+        let col2 = Vec3::new(rhs.row0.z, rhs.row1.z, rhs.row2.z);
+
+        Mat3::new(
+            Vec3::new(self.row0.dot(&col0), self.row0.dot(&col1), self.row0.dot(&col2)),
+            Vec3::new(self.row1.dot(&col0), self.row1.dot(&col1), self.row1.dot(&col2)),
+            Vec3::new(self.row2.dot(&col0), self.row2.dot(&col1), self.row2.dot(&col2))
+        )
+    }
+}
+
 
 // endregion

@@ -33,17 +33,24 @@ impl Window{
         Window { window, glfw, events }
     }
 
-    pub fn process_events(&mut self) {
+    pub fn process_events(&mut self) -> Vec<glfw::WindowEvent> {
+        let mut events = Vec::new();
+
         for (_, event) in glfw::flush_messages(&self.events) {
             match event {
                 glfw::WindowEvent::FramebufferSize(width, height) => {
                     unsafe { gl::Viewport(0, 0, width, height) }
                 }
-                _ => {}
+                glfw::WindowEvent::Key(_, _, _, _) => { 
+                    events.push(event); 
+                }
+                _ => {  }
             }
         }
 
         self.glfw.poll_events();
+
+        events
     }
 
     pub fn swap_buffers(&mut self) {
