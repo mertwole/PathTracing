@@ -297,6 +297,19 @@ impl Vec3 {
 
         Vec3::new(x, y, z)
     }
+
+    // Angle is in steradians.
+    pub fn random_in_solid_angle(direction : &Vec3, angle : f32, rand_0 : f32, rand_1 : f32) -> Vec3 {
+        let theta = rand_0 * PI * 2.0;
+        let phi = f32::acos(((2.0 * rand_1) - 1.0) * f32::cos(angle * 0.25));
+        let x = f32::sin(phi) * f32::cos(theta);
+        let y = f32::sin(phi) * f32::sin(theta);
+        let z = f32::cos(phi);
+        let rand = Vec3::new(x, y, z);
+
+        let rotation = Mat3::create_rotation_from_to(&Vec3::new(0.0, 0.0, 1.0), &direction);
+        &rotation * &rand
+    } 
 }
 
 impl ops::Add<&Vec3> for &Vec3 {
@@ -399,6 +412,19 @@ impl Mat3 {
             Vec3::new(0.0, 0.0, 1.0)
         )
     }
+
+    // From and to are normalized.
+    pub fn create_rotation_from_to(from : &Vec3, to : &Vec3) -> Mat3 {
+        let cross = from.cross(to);
+        let cos = from.dot(to);
+
+        let v = Mat3::new(
+            Vec3::new(0.0, -cross.z, cross.y),
+            Vec3::new(cross.z, 0.0, -cross.x),
+            Vec3::new(-cross.y, cross.x, 0.0));
+
+        &(&Mat3::identity() + &v) + &(&(&v * &v) * (1.0 / (1.0 + cos)))
+    }
 }
 
 impl ops::Mul<&Vec3> for &Mat3 {
@@ -409,6 +435,20 @@ impl ops::Mul<&Vec3> for &Mat3 {
             rhs.dot(&self.row1),
             rhs.dot(&self.row2),
         )
+    }
+}
+
+impl ops::Mul<f32> for &Mat3 {
+    type Output = Mat3;
+    fn mul(self, rhs : f32) -> Mat3 {
+        Mat3::new(&self.row0 * rhs, &self.row1 * rhs, &self.row2 * rhs)
+    }
+}
+
+impl ops::Add<&Mat3> for &Mat3 {
+    type Output = Mat3;
+    fn add(self, rhs : &Mat3) -> Mat3 {
+        Mat3::new(&self.row0 + &rhs.row0, &self.row1 + &rhs.row1, &self.row2 + &rhs.row2)
     }
 }
 

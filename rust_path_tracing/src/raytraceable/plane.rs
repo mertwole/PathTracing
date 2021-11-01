@@ -35,8 +35,9 @@ impl Raytraceable for Plane {
 
         result.hit = true;
         result.point = &ray.source + &(&ray.direction * t);
-        result.normal = self.normal.clone();
-        //result.normal_facing_outside = sign(dot(plane.normal, -ray.direction));
+        let normal_facing_dir = if ray.direction.dot(&self.normal) > 0.0 { -1.0 } else { 1.0 };
+        result.hit_inside = normal_facing_dir < 0.0;
+        result.normal = &self.normal * normal_facing_dir;
         result.t = t;
         result.material_id = self.material_id;
 

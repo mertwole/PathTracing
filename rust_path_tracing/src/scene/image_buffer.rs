@@ -27,9 +27,15 @@ impl ImageBuffer {
             for img_y in 0..self.height{
                 let mut pixel = self.get_pixel(img_x, img_y);
                 pixel = &pixel * color_multiplier;
-                let (r, g, b) = (pixel.x, pixel.y, pixel.z);
+                // Tonemapping
+                //pixel = &pixel / &(&pixel + &Vec3::new_xyz(1.0));
                 // Gamma correction
-                image_column_data.push(Color24bpprgb::from_normalized(r.powf(1.0 / 2.2), g.powf(1.0 / 2.2), b.powf(1.0 / 2.2)));
+                pixel.x = pixel.x.powf(1.0 / 2.2);
+                pixel.y = pixel.y.powf(1.0 / 2.2);
+                pixel.z = pixel.z.powf(1.0 / 2.2);
+
+                let (r, g, b) = (pixel.x, pixel.y, pixel.z);
+                image_column_data.push(Color24bpprgb::from_normalized(r, g, b));
             }
             image_data.push(image_column_data);
         }

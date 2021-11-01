@@ -25,24 +25,41 @@ fn init_materials(scene : &mut Scene) {
     // 0th mat (emissive)
     let mut material = BaseMaterial::default();
     material.emissive = 1.0;
+    material.emission = Vec3::new_xyz(1.0);
     materials.push(Box::new(material));
     // 1th mat
     let mut material = BaseMaterial::default();
     material.color = Vec3::new(0.8, 0.2, 0.1);
+    material.reflective = 0.01;
     materials.push(Box::new(material));
     // 2th mat
     let mut material = BaseMaterial::default();
-    material.color = &Vec3::new(1.0, 1.0, 1.0) * 0.9;
+    material.color = Vec3::new(0.1, 0.2, 0.8);
+    material.reflective = 0.01;
     materials.push(Box::new(material));
     // 3th mat
     let mut material = BaseMaterial::default();
     material.refractive = 1.0;
-    material.refraction = 1.33;
+    material.refraction = 1.05;
     materials.push(Box::new(material));
     // 4th mat
     let mut material = BaseMaterial::default();
-    material.color = Vec3::new(0.8, 0.8, 0.8);
-    material.reflective = 0.9;
+    material.color = Vec3::new(1.0, 1.0, 1.0);
+    material.reflective = 0.3;
+    materials.push(Box::new(material));
+    // 5th mat
+    let mut material = BaseMaterial::default();
+    material.color = Vec3::new_xyz(1.0);
+    material.reflective = 0.1;
+    materials.push(Box::new(material));
+    // 6th mat
+    let material = PBRMaterial::new(Vec3::new(0.91, 0.92, 0.92), 0.2, 1.0);
+    materials.push(Box::new(material));
+    // 7th mat
+    let material = PBRMaterial::new(Vec3::new(0.95, 0.64, 0.54), 0.5, 1.0);
+    materials.push(Box::new(material));
+    // 8th mat
+    let material = PBRMaterial::new(Vec3::new(1.0, 0.71, 0.29), 0.2, 1.0);
     materials.push(Box::new(material));
 
     scene.init_materials(materials);
@@ -50,41 +67,43 @@ fn init_materials(scene : &mut Scene) {
 
 fn init_primitives(scene : &mut Scene) {
     // floor
-    scene.add_primitive(Box::new(Plane::new(Vec3::new(0.0, -3.0, 0.0), Vec3::new(0.0, 1.0, 0.0), 2)));
+    scene.add_primitive(Box::new(Plane::new(Vec3::new(0.0, -3.0, 0.0), Vec3::new(0.0, 1.0, 0.0), 5)));
     // ceiling
     scene.add_primitive(Box::new(Plane::new(Vec3::new(0.0, 3.0, 0.0), Vec3::new(0.0, -1.0, 0.0), 0)));
     // walls
-    scene.add_primitive(Box::new(Plane::new(Vec3::new(0.0, 0.0, -5.0), Vec3::new(-1.0, 0.0, 1.0), 1)));
-    scene.add_primitive(Box::new(Plane::new(Vec3::new(0.0, 0.0, -5.0), Vec3::new(1.0, 0.0, 1.0), 2)));
+    scene.add_primitive(Box::new(Plane::new(Vec3::new(0.0, 0.0, -5.0), Vec3::new(-1.0, 0.0, 1.0), 2)));
+    scene.add_primitive(Box::new(Plane::new(Vec3::new(0.0, 0.0, -5.0), Vec3::new(1.0, 0.0, 1.0), 1)));
 
-    scene.add_primitive(Box::new(Sphere::new(Vec3::new(0.0, -1.5, 0.0), 1.0, 2)));
+    scene.add_primitive(Box::new(Sphere::new(Vec3::new(-2.5, -2.0, 0.0), 1.0, 6)));
+    scene.add_primitive(Box::new(Sphere::new(Vec3::new(0.0, -2.0, 0.0), 1.0, 7)));
+    scene.add_primitive(Box::new(Sphere::new(Vec3::new(2.5, -2.0, 0.0), 1.0, 8)));
 
-    //let mut kd_tree = KDTree::new(2);
-    //kd_tree.load(&"data/stanford-dragon.obj".to_string(), &"data/stanford-dragon.tree".to_string());
-    //kd_tree.load(&"data/cube.obj".to_string(), &"data/cube.tree".to_string());
-    //scene.add_primitive(Box::new(kd_tree));
+    // let mut kd_tree = KDTree::new(1);
+    // kd_tree.load(&"data/stanford-dragon.obj".to_string(), &"data/stanford-dragon.tree".to_string());
+    // kd_tree.load(&"data/cube.obj".to_string(), &"data/cube.tree".to_string());
+    // scene.add_primitive(Box::new(kd_tree));
 }
 
 fn main() {
-    let screen_width = 1000u32;
-    let screen_height = 1000u32;
+    let screen_width = 1024u32;
+    let screen_height = 1024u32;
 
     let camera = Camera {
         resolution : UVec2::new(screen_width as usize, screen_height as usize),
-        rotation: Mat3::identity(),
+        rotation: Mat3::create_rotation_x(0.0 / 180.0 * math::PI),
         position: Vec3::new(0.0, 0.0, 15.0),
 
         fov : 30.0 / 180.0 * math::PI,
         near_plane : 0.0,
         focal_length : 15.0,
 
-        bokeh_shape : BokehShape::Circle,
-        bokeh_size : 0.2
+        bokeh_shape : BokehShape::Square,
+        bokeh_size : 0.0
     };
 
     let mut scene = Scene::new(camera);
-    scene.set_trace_depth(16);
-    scene.set_workgroup_size(20, 20);
+    scene.set_trace_depth(4);
+    scene.set_workgroup_size(16, 16);
     scene.init();
 
     init_materials(&mut scene);

@@ -1,4 +1,4 @@
-use crate::math::Vec3;
+use crate::math::{Vec3, Math};
 use crate::rand::*;
 use std::marker::{Send, Sync};
 use crate::ray::RayTraceResult;
@@ -35,9 +35,24 @@ impl BaseMaterial{
     }
 }
 
+impl BaseMaterial {
+    fn fresnel_reflection(theta_cos : f32, refraction : f32) -> f32 {
+        let refr_sqr = refraction * refraction;
+        
+        let c = theta_cos * refraction;
+        let g = (1.0 + c * c - refr_sqr).sqrt();
+
+        let a = (g - c) / (g + c);
+        let b_nom = c * (g + c) - refr_sqr;
+        let b_den = c * (g - c) + refr_sqr;
+        let b = b_nom / b_den;
+
+        0.5 * a * a * (1.0 + b * b)
+    }
+}
+
 impl Material for BaseMaterial {
     fn get_color(&self, dir : &Vec3, trace_result : &RayTraceResult) -> GetColorResult{
-        //let mut rng = rand::prelude::thread_rng();
         let random_num = thread_rng().gen_range(0.0, 1.0);
         if random_num < self.reflective {
             // reflect
@@ -48,12 +63,22 @@ impl Material for BaseMaterial {
             return GetColorResult::Color(self.emission.clone());
         } else if random_num < self.reflective + self.emissive + self.refractive {
             // refract
-            let refraction = if trace_result.hit_inside { 1.0 / self.refraction } else { self.refraction };
-            let new_dir = match dir.refract(&trace_result.normal, refraction) {
-                Some(direction) => { direction }
-                None => { 
-                    let reflected = dir.reflect(&trace_result.normal);
-                    &reflected * if trace_result.hit_inside { 1.0 } else { -1.0 }
+            let cos = (&Vec3::zero() - &dir).dot(&trace_result.normal);
+            let refraction = if trace_result.hit_inside { self.refraction } else { 1.0 / self.refraction };
+            let mut fresnel = Self::fresnel_reflection(cos, refraction);
+
+            let rand = thread_rng().gen_range(0.0, 1.0);
+            let new_dir = if fresnel > rand {
+                // reflect
+                dir.reflect(&trace_result.normal)
+            } else {
+                // refract
+                match dir.refract(&trace_result.normal, refraction) {
+                    Some(direction) => { direction }
+                    None => {
+                        let reflected = dir.reflect(&trace_result.normal);
+                        &reflected * if trace_result.hit_inside { -1.0 } else { 1.0 }
+                    }
                 }
             };
 
@@ -78,14 +103,14 @@ pub struct PBRMaterial{
     roughness : f32,
     metallic : f32,
     // Precomputed
-    fresnel_k : Vec3,
-    roughness_sqr : f32
+    f0 : Vec3,
+    roughness_sqr : f32,
 }
 
 impl PBRMaterial{
     pub fn new(albedo : Vec3, roughness : f32, metallic : f32) -> PBRMaterial{
         PBRMaterial {
-            fresnel_k : &(&albedo * metallic) + &(&Vec3::new_xyz(0.04) * (1.0 - metallic)), 
+            f0 : &(&albedo * metallic) + &(&Vec3::new_xyz(0.04) * (1.0 - metallic)), 
             roughness_sqr : roughness * roughness,
             albedo,
             roughness,
@@ -93,49 +118,75 @@ impl PBRMaterial{
         }
     }
 
-    fn fresnel(&self, nl : f32) -> Vec3{
-        &self.fresnel_k + &(&(&Vec3::new_xyz(1.0) - &self.fresnel_k) * (1.0 - nl).powi(5))
+    fn ndf(&self, nh : f32) -> f32 {
+        let denom_sqrt = nh * nh * (self.roughness_sqr - 1.0) + 1.0;
+        self.roughness_sqr / (denom_sqrt * denom_sqrt * math::PI)
     }
 
-    fn ggx_microfacet_distribution(&self, nh : f32) -> f32{
-        let nh_sqr = nh * nh;
-        let denominator_sqrt = 1.0 - nh_sqr * (1.0 - self.roughness_sqr);
-        self.roughness_sqr * math::INV_PI / (denominator_sqrt * denominator_sqrt)
+    fn geometry(&self, angle_cos : f32) -> f32 {
+        let k = self.roughness_sqr * 0.5;
+
+        //let mut k = 1.0 + self.roughness;
+        //k = k * k * 0.125;
+
+        angle_cos / (angle_cos * (1.0 - k) + k)
     }
 
-    fn ggx_selfshadowing(&self, angle_cos : f32) -> f32{
-        let cos_sqr = angle_cos * angle_cos;
-        2.0 / (1.0 + (1.0 + self.roughness_sqr * ((1.0 - cos_sqr) / cos_sqr)).sqrt())
+    fn fresnel(&self, hi : f32) -> Vec3 {
+        &self.f0 + &(&(&Vec3::new_xyz(1.0) - &self.f0) * (1.0 - hi).powi(5))
+    }
+
+    fn brdf(&self, normal : &Vec3, input_dir : &Vec3, output_dir : &Vec3) -> Vec3 {
+        let ni = normal.dot(input_dir);
+        let no = normal.dot(output_dir);
+        let h = (output_dir + input_dir).normalized();
+
+        let geometry = self.geometry(ni) * self.geometry(no);
+        let ndf = self.ndf(normal.dot(&h));
+
+        let specular_k = self.fresnel(h.dot(&input_dir));
+        let diffuse_k = &(&Vec3::new_xyz(1.0) - &specular_k) * (1.0 - self.metallic);
+
+        let diffuse = math::INV_PI * &self.albedo;
+        let specular = geometry * ndf / (4.0 * ni * no);
+
+        &(&specular_k * specular) + &(&diffuse_k * &diffuse)
     }
 }
 
 impl Material for PBRMaterial{
     fn get_color(&self, dir : &Vec3, trace_result : &RayTraceResult) -> GetColorResult{
-        let mut rng = rand::prelude::thread_rng();
-        let mut v = Vec3::new(
-            rng.gen_range(-1.0, 1.0),
-            rng.gen_range(-1.0, 1.0),
-            rng.gen_range(-1.0, 1.0),
-        ).normalized();
-        if v.dot(&trace_result.normal) < 0.0 { v = &Vec3::zero() - &v; }
-        
-        let l = &Vec3::zero() - &dir;
-        let nl = trace_result.normal.dot(&l);
-        let nv = trace_result.normal.dot(&v);
-        let h = (&v + &l).normalized();
-        let specular = self.fresnel(nl);
-        let mut color = Vec3::zero();
-        // Specular
-        color = &color + &(&specular * (
-        self.ggx_microfacet_distribution(trace_result.normal.dot(&h)) * 
-        self.ggx_selfshadowing(nl) *
-        self.ggx_selfshadowing(nv) / (4.0 * nv)));
-        // Diffuse
-        color = &color + &(&(&Vec3::new_xyz(1.0) - &specular) * &(&self.albedo * ((1.0 - self.metallic) * nl * math::INV_PI)));
-        
-        color = &color * math::PI;
+        let rand = thread_rng().gen_range(0.0, 1.0);
+        let reflect_prob = 1.0 - self.roughness;
+        let reflect_dispersion = 0.001;
+        let random_dir_prob = (1.0 - reflect_prob) / (1.0 - reflect_dispersion);
+        let (selection_prob, output_dir) = if rand < reflect_prob {
+            // Reflect
+            let reflected = dir.reflect(&trace_result.normal);
+            let dir = Vec3::random_in_solid_angle(&reflected, 
+                reflect_dispersion * 4.0 * math::PI, 
+                thread_rng().gen_range(0.0, 1.0), 
+                thread_rng().gen_range(0.0, 1.0));
+            let prob = random_dir_prob + (1.0 - random_dir_prob) / reflect_dispersion;
+            (prob, dir)
+        } else {
+            // Random
+            let mut dir = Vec3::random_on_unit_sphere(
+                thread_rng().gen_range(0.0, 1.0), 
+                thread_rng().gen_range(0.0, 1.0)
+            );
+            dir = if dir.dot(&trace_result.normal) < 0.0 { &dir * -1.0 } else { dir };
+
+            (random_dir_prob, dir)
+        };
+
+        let input_dir = &Vec3::zero() - &dir;
+        let mut mul = self.brdf(&trace_result.normal, &input_dir, &output_dir);
+        mul = math::PI * output_dir.dot(&trace_result.normal) * &mul;
+
+        mul = &mul / selection_prob;
 
         return GetColorResult
-        ::NextRayColorMultiplierAndDirection(color, v);
+        ::NextRayColorMultiplierAndDirection(mul, output_dir);
     }
 }
