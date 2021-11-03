@@ -65,10 +65,12 @@ impl Material for BaseMaterial {
             // refract
             let cos = (&Vec3::zero() - &dir).dot(&trace_result.normal);
             let refraction = if trace_result.hit_inside { self.refraction } else { 1.0 / self.refraction };
-            let mut fresnel = Self::fresnel_reflection(cos, refraction);
+            let fresnel = Self::fresnel_reflection(cos, refraction);
+
+            //return GetColorResult::Color(Vec3::new_xyz(fresnel));
 
             let rand = thread_rng().gen_range(0.0, 1.0);
-            let new_dir = if fresnel > rand {
+            let new_dir = if rand < fresnel {
                 // reflect
                 dir.reflect(&trace_result.normal)
             } else {
@@ -76,6 +78,7 @@ impl Material for BaseMaterial {
                 match dir.refract(&trace_result.normal, refraction) {
                     Some(direction) => { direction }
                     None => {
+                        //return GetColorResult::Color(Vec3::new(100.0, 0.0, 0.0));
                         let reflected = dir.reflect(&trace_result.normal);
                         &reflected * if trace_result.hit_inside { -1.0 } else { 1.0 }
                     }
@@ -119,6 +122,7 @@ impl PBRMaterial{
     }
 
     fn ndf(&self, nh : f32) -> f32 {
+        let nh = if nh > 0.95 { 0.95 } else { nh };
         let denom_sqrt = nh * nh * (self.roughness_sqr - 1.0) + 1.0;
         self.roughness_sqr / (denom_sqrt * denom_sqrt * math::PI)
     }
@@ -163,12 +167,13 @@ impl Material for PBRMaterial{
         let (selection_prob, output_dir) = if rand < reflect_prob {
             // Reflect
             let reflected = dir.reflect(&trace_result.normal);
-            let dir = Vec3::random_in_solid_angle(&reflected, 
-                reflect_dispersion * 4.0 * math::PI, 
-                thread_rng().gen_range(0.0, 1.0), 
+            let rand_dir = Vec3::random_in_solid_angle(&reflected, 
+                reflect_dispersion * 4.0 * math::PI,
+                thread_rng().gen_range(0.0, 1.0),
                 thread_rng().gen_range(0.0, 1.0));
+
             let prob = random_dir_prob + (1.0 - random_dir_prob) / reflect_dispersion;
-            (prob, dir)
+            (prob, rand_dir)
         } else {
             // Random
             let mut dir = Vec3::random_on_unit_sphere(
@@ -182,8 +187,8 @@ impl Material for PBRMaterial{
 
         let input_dir = &Vec3::zero() - &dir;
         let mut mul = self.brdf(&trace_result.normal, &input_dir, &output_dir);
-        mul = math::PI * output_dir.dot(&trace_result.normal) * &mul;
 
+        mul = math::PI * output_dir.dot(&trace_result.normal) * &mul;
         mul = &mul / selection_prob;
 
         return GetColorResult

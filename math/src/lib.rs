@@ -301,12 +301,11 @@ impl Vec3 {
     // Angle is in steradians.
     pub fn random_in_solid_angle(direction : &Vec3, angle : f32, rand_0 : f32, rand_1 : f32) -> Vec3 {
         let theta = rand_0 * PI * 2.0;
-        let phi = f32::acos(((2.0 * rand_1) - 1.0) * f32::cos(angle * 0.25));
+        let phi = f32::acos((1.0 - rand_1) * f32::cos(angle * 0.25) + rand_1);
         let x = f32::sin(phi) * f32::cos(theta);
         let y = f32::sin(phi) * f32::sin(theta);
         let z = f32::cos(phi);
         let rand = Vec3::new(x, y, z);
-
         let rotation = Mat3::create_rotation_from_to(&Vec3::new(0.0, 0.0, 1.0), &direction);
         &rotation * &rand
     } 
