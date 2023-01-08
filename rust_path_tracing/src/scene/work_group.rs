@@ -73,7 +73,7 @@ impl WorkGroup {
         self.iteration += 1;
     }
 
-    pub fn get_raw_image_data(&self) -> Vec<Vec<Color24bpprgb>> {
+    pub fn get_raw_image_data(&self) -> Vec<Vec<HdrColor>> {
         self.buffer.get_pixel_vec(1.0 / (self.iteration as f32))
     }
 }

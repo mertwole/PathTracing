@@ -68,7 +68,19 @@ impl ops::Div<usize> for UVec2 {
 
 // endregion
 
-// region Color
+// region HdrColor
+#[derive(Clone, Copy, Default)]
+pub struct HdrColor(Vec3);
+
+impl HdrColor {
+    pub fn from_vec3(vec3: Vec3) -> HdrColor {
+        HdrColor(vec3)
+    }
+}
+
+// endregion
+
+// region Color24bpprgb
 #[derive(Clone, Copy, Default)]
 pub struct Color24bpprgb {
     pub r: u8,
@@ -79,6 +91,11 @@ pub struct Color24bpprgb {
 impl Color24bpprgb {
     pub fn new(r: u8, g: u8, b: u8) -> Color24bpprgb {
         Color24bpprgb { r, g, b }
+    }
+
+    pub fn from_hdr_tone_mapped(hdr: HdrColor) -> Color24bpprgb {
+        let mut tone_mapped = hdr.0 / (hdr.0 + Vec3::new_xyz(1.0));
+        Color24bpprgb::from_normalized(tone_mapped.x, tone_mapped.y, tone_mapped.z)
     }
 
     pub fn from_normalized(r: f32, g: f32, b: f32) -> Color24bpprgb {
@@ -239,16 +256,34 @@ impl Vec3 {
         Vec3::new(x, y, z)
     }
 
-    // Angle is in steradians.
-    pub fn random_in_solid_angle(direction: Vec3, angle: f32, rand_0: f32, rand_1: f32) -> Vec3 {
-        let theta = rand_0 * PI * 2.0;
-        let phi = f32::acos((1.0 - rand_1) * f32::cos(angle * 0.25) + rand_1);
-        let x = f32::sin(phi) * f32::cos(theta);
-        let y = f32::sin(phi) * f32::sin(theta);
-        let z = f32::cos(phi);
-        let rand = Vec3::new(x, y, z);
-        let rotation = Mat3::create_rotation_from_to(Vec3::new(0.0, 0.0, 1.0), direction);
-        rotation * rand
+    pub fn random_on_hemisphere(rand_0: f32, rand_1: f32, normal: Vec3) -> Vec3 {
+        let rand = Self::random_on_unit_sphere(rand_0, rand_1);
+        if rand.dot(normal) < 0.0 {
+            rand * -1.0
+        } else {
+            rand
+        }
+    }
+
+    pub fn cosine_weighted_random_on_hemisphere(rand_0: f32, rand_1: f32, normal: Vec3) -> Vec3 {
+        let rand_0 = f32::cos(PI * 0.5 * (1.0 - rand_0));
+        let theta = rand_1 * PI * 2.0;
+
+        // Without EPSILON ray goes under the surface sometimes.
+        let mut rand = normal * (1.0 - rand_0 + EPSILON);
+        let rand_tangent = if rand.y.abs() + rand.z.abs() < EPSILON {
+            Vec3::new(-rand.y, rand.x, 0.0)
+        } else {
+            Vec3::new(0.0, rand.z, -rand.y)
+        };
+        let rand_tangent = rand_tangent.normalized();
+        let rand_bitangent = rand.cross(rand_tangent);
+
+        let r = rand_0.sqrt();
+        rand = rand + rand_tangent * r * f32::cos(theta);
+        rand = rand + rand_bitangent * r * f32::sin(theta);
+
+        rand
     }
 }
 
@@ -352,20 +387,6 @@ impl Mat3 {
             Vec3::new(sin, cos, 0.0),
             Vec3::new(0.0, 0.0, 1.0),
         )
-    }
-
-    // From and to are normalized.
-    pub fn create_rotation_from_to(from: Vec3, to: Vec3) -> Mat3 {
-        let cross = from.cross(to);
-        let cos = from.dot(to);
-
-        let v = Mat3::new(
-            Vec3::new(0.0, -cross.z, cross.y),
-            Vec3::new(cross.z, 0.0, -cross.x),
-            Vec3::new(-cross.y, cross.x, 0.0),
-        );
-
-        Mat3::identity() + v + (v * v) * (1.0 / (1.0 + cos))
     }
 }
 

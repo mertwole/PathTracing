@@ -155,6 +155,7 @@ impl Scene {
         }
     }
 
+    // FIXME: Code duplication.
     pub fn save_output(&self, path: &std::path::Path) {
         let mut buffer: Vec<u8> =
             vec![0u8; self.camera.resolution.x * self.camera.resolution.y * 3];
@@ -172,9 +173,11 @@ impl Scene {
                         glob_y = self.camera.resolution.y - glob_y - 1;
                         let glob_adress = glob_x + glob_y * self.camera.resolution.x;
 
-                        buffer[glob_adress * 3] = buf_pixel.r;
-                        buffer[glob_adress * 3 + 1] = buf_pixel.g;
-                        buffer[glob_adress * 3 + 2] = buf_pixel.b;
+                        let buf_color = Color24bpprgb::from_hdr_tone_mapped(buf_pixel);
+
+                        buffer[glob_adress * 3] = buf_color.r;
+                        buffer[glob_adress * 3 + 1] = buf_color.g;
+                        buffer[glob_adress * 3 + 2] = buf_color.b;
                     }
                 }
             }
@@ -206,9 +209,11 @@ impl Scene {
                         let glob_y = y * self.workgroup_size.y + buf_y;
                         let glob_adress = glob_x + glob_y * self.camera.resolution.x;
 
-                        buffer[glob_adress] = (buf_pixel.r as u32)
-                            + 256 * (buf_pixel.g as u32)
-                            + 256 * 256 * (buf_pixel.b as u32);
+                        let buf_color = Color24bpprgb::from_hdr_tone_mapped(buf_pixel);
+
+                        buffer[glob_adress] = (buf_color.r as u32)
+                            + 256 * (buf_color.g as u32)
+                            + 256 * 256 * (buf_color.b as u32);
                     }
                 }
             }

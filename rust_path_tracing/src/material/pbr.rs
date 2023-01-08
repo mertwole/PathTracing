@@ -84,62 +84,30 @@ impl Material for PBRMaterial {
     fn get_color(&self, dir: Vec3, trace_result: &RayTraceResult) -> GetColorResult {
         let input_dir = dir * -1.0;
 
-        let mut random_dir = Vec3::random_on_unit_sphere(
-            thread_rng().gen_range(0.0, 1.0),
-            thread_rng().gen_range(0.0, 1.0),
-        );
-        random_dir = if random_dir.dot(trace_result.normal) < 0.0 {
-            random_dir * -1.0
-        } else {
-            random_dir
-        };
+        let rand_0 = thread_rng().gen_range(0.0, 1.0);
+        let rand_1 = thread_rng().gen_range(0.0, 1.0);
 
-        let (mul, output_dir) = if thread_rng().gen_bool(0.5) {
+        let (mul, output_dir, selection_probability) = if thread_rng().gen_bool(0.5) {
             // Diffuse
-            let diffuse = self.brdf_diffuse(input_dir, random_dir)
-                * random_dir.dot(trace_result.normal)
-                * math::PI
-                * 2.0;
+            let output_dir =
+                Vec3::cosine_weighted_random_on_hemisphere(rand_0, rand_1, trace_result.normal);
+            let output_dir_pdf = output_dir.dot(trace_result.normal);
 
-            (diffuse, random_dir)
+            let diffuse = self.brdf_diffuse(input_dir, output_dir);
+
+            (diffuse, output_dir, output_dir_pdf)
         } else {
             // Specular
-            //let specular_dir = random_dir;
+            let output_dir = Vec3::random_on_hemisphere(rand_0, rand_1, trace_result.normal);
+            let output_dir_pdf = 1.0;
 
-            let rand_x = thread_rng().gen_range(0.0, 1.0);
-            let rand_y = thread_rng().gen_range(0.0, 1.0);
-            let phi = 2.0 * math::PI * rand_x;
-            let cos_theta = ((1.0 - rand_y)
-                / (1.0 + (self.roughness_sqr * self.roughness_sqr - 1.0) * rand_y))
-                .sqrt();
-            let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
+            let specular = self.brdf_specular(trace_result.normal, input_dir, output_dir);
 
-            let specular_dir = Vec3::new(phi.cos() * sin_theta, phi.sin() * sin_theta, cos_theta);
-            let up = if trace_result.normal.z.abs() < 0.999 {
-                Vec3::new(0.0, 0.0, 1.0)
-            } else {
-                Vec3::new(1.0, 0.0, 0.0)
-            };
-            let tangent = up.cross(trace_result.normal).normalized();
-            let bitangent = trace_result.normal.cross(tangent);
-
-            let specular_dir = tangent * specular_dir.x
-                + bitangent * specular_dir.y
-                + trace_result.normal * specular_dir.z;
-            let specular_dir = specular_dir.normalized();
-
-            let h = (specular_dir + input_dir).normalized();
-
-            let specular_dir_pdf = trace_result.normal.dot(h);
-
-            let specular = self.brdf_specular(trace_result.normal, input_dir, specular_dir)
-                / specular_dir_pdf
-                * specular_dir.dot(trace_result.normal)
-                * math::PI
-                * 2.0;
-
-            (specular, specular_dir)
+            (specular, output_dir, output_dir_pdf)
         };
+
+        let mul =
+            mul * (output_dir.dot(trace_result.normal) / selection_probability * math::PI * 2.0);
 
         GetColorResult::NextRayColorMultiplierAndDirection(mul, output_dir)
     }

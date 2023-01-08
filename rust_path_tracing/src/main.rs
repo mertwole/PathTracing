@@ -30,13 +30,13 @@ fn init_materials(scene: &mut Scene) {
     materials.push(Box::new(material));
     // 1th mat
     let mut material = BaseMaterial::default();
-    material.color = Vec3::new(0.8, 0.2, 0.1);
-    material.reflective = 0.01;
+    material.color = Vec3::new(1.0, 0.0, 0.0);
+    material.reflective = 0.0;
     materials.push(Box::new(material));
     // 2th mat
     let mut material = BaseMaterial::default();
-    material.color = Vec3::new(0.1, 0.2, 0.8);
-    material.reflective = 0.01;
+    material.color = Vec3::new(0.0, 1.0, 0.0);
+    material.reflective = 0.0;
     materials.push(Box::new(material));
     // 3th mat
     let mut material = BaseMaterial::default();
@@ -65,13 +65,18 @@ fn init_materials(scene: &mut Scene) {
     let material = PBRMaterial::new(Vec3::new(1.0, 1.0, 1.0), 0.5, 0.0);
     materials.push(Box::new(material));
     // 9th mat
-    let material = PBRMaterial::new(Vec3::new(1.0, 1.0, 1.0), 0.2, 0.0);
+    let material = PBRMaterial::new(Vec3::new(1.0, 1.0, 1.0), 0.3, 0.5);
     materials.push(Box::new(material));
     // 10th mat
     let material = PBRMaterial::new(Vec3::new(1.0, 1.0, 1.0), 0.1, 0.0);
     materials.push(Box::new(material));
     // 11th mat
     let material = PBRMaterial::new(Vec3::new(1.0, 1.0, 1.0), 0.1, 1.0);
+    materials.push(Box::new(material));
+    // 12th mat (emissive)
+    let mut material = BaseMaterial::default();
+    material.emissive = 1.0;
+    material.emission = Vec3::new_xyz(100.0);
     materials.push(Box::new(material));
 
     scene.init_materials(materials);
@@ -82,7 +87,7 @@ fn init_primitives(scene: &mut Scene) {
     scene.add_primitive(Box::new(Plane::new(
         Vec3::new(0.0, -3.0, 0.0),
         Vec3::new(0.0, 1.0, 0.0),
-        5,
+        3,
     )));
     // ceiling
     scene.add_primitive(Box::new(Plane::new(
@@ -108,11 +113,11 @@ fn init_primitives(scene: &mut Scene) {
         2,
     )));
 
-    scene.add_primitive(Box::new(Sphere::new(Vec3::new(-2.0, 0.0, 0.0), 1.0, 7)));
-    //scene.add_primitive(Box::new(Sphere::new(Vec3::new(-1.0, 0.0, 0.0), 0.5, 8)));
-    scene.add_primitive(Box::new(Sphere::new(Vec3::new(0.0, 0.0, 0.0), 1.0, 9)));
+    scene.add_primitive(Box::new(Sphere::new(Vec3::new(-1.5, -2.0, 0.0), 1.0, 7)));
+    scene.add_primitive(Box::new(Sphere::new(Vec3::new(0.0, -0.5, 0.0), 0.5, 12)));
+    scene.add_primitive(Box::new(Sphere::new(Vec3::new(1.5, -2.0, 0.0), 1.0, 9)));
     //scene.add_primitive(Box::new(Sphere::new(Vec3::new(1.0, 0.0, 0.0), 0.5, 10)));
-    scene.add_primitive(Box::new(Sphere::new(Vec3::new(2.0, 0.0, 0.0), 1.0, 11)));
+    //scene.add_primitive(Box::new(Sphere::new(Vec3::new(2.0, 0.0, 0.0), 1.0, 11)));
 
     // let mut kd_tree = KDTree::new(1);
     // kd_tree.load(&"data/stanford-dragon.obj".to_string(), &"data/stanford-dragon.tree".to_string());
@@ -164,7 +169,7 @@ fn main() {
                 reset_render = false;
             }
 
-            scene.iterations(16);
+            scene.iterations(1);
             println!("iteration {}", iterations);
             iterations += 1;
             unsafe {
