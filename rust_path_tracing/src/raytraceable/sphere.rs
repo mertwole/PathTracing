@@ -12,7 +12,12 @@ pub struct Sphere {
 
 impl Sphere {
     pub fn new(center: Vec3, radius: f32, material_id: usize) -> Sphere {
-        Sphere { center, radius, radius_sqr: radius * radius, material_id }
+        Sphere {
+            center,
+            radius,
+            radius_sqr: radius * radius,
+            material_id,
+        }
     }
 }
 
@@ -20,14 +25,14 @@ impl Raytraceable for Sphere {
     fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
         let mut result = RayTraceResult::void();
 
-        let a = &self.center - &ray.source;
+        let a = self.center - ray.source;
         //length(Direction * t + Source - Center) = radius
         // A = center - source
         //t^2 * dot(Direction, Direction) - 2 * t * dot(A, Direction) + dot(A, A) = Radius ^ 2
         //Direction is normalized => dot(Direction, Direction) = 1
-        let half_second_k = -a.dot(&ray.direction);
+        let half_second_k = -a.dot(ray.direction);
         //Discriminant = second_k ^ 2 - 4 * first_k * third_k
-        let discriminant = 4.0 * (half_second_k * half_second_k - (a.dot(&a) - self.radius_sqr));
+        let discriminant = 4.0 * (half_second_k * half_second_k - (a.dot(a) - self.radius_sqr));
         if discriminant < 0.0 {
             return result;
         }
@@ -40,15 +45,15 @@ impl Raytraceable for Sphere {
             result.t = t2;
         } else if t1 >= ray.min && t1 <= ray.max {
             result.t = t1;
-        //if we choose max value of t it means that ray is traced from inside
+            //if we choose max value of t it means that ray is traced from inside
             result.hit_inside = true;
         } else {
             return result;
         }
 
-        result.point = &(result.t * &ray.direction) + &ray.source;
+        result.point = result.t * ray.direction + ray.source;
         let normal_facing_outside = if result.hit_inside { -1.0 } else { 1.0 };
-        result.normal = &(&result.point - &self.center) / (self.radius * normal_facing_outside);
+        result.normal = (result.point - self.center) / (self.radius * normal_facing_outside);
         result.hit = true;
         result.material_id = self.material_id;
 

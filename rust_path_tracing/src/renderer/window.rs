@@ -1,36 +1,49 @@
 use std::sync::mpsc::Receiver;
 
-use glfw::{Context};
-pub use glfw::{Key};
+use glfw::Context;
+pub use glfw::Key;
 
 pub struct WindowParameters {
-    pub width : u32,
-    pub height : u32,
-    pub title : String
+    pub width: u32,
+    pub height: u32,
+    pub title: String,
 }
 
 pub struct Window {
-    window : glfw::Window,
-    glfw : glfw::Glfw,
-    events : Receiver<(f64, glfw::WindowEvent)>
+    window: glfw::Window,
+    glfw: glfw::Glfw,
+    events: Receiver<(f64, glfw::WindowEvent)>,
 }
 
-impl Window{    
-    pub fn open(parameters : WindowParameters) -> Window {
+impl Window {
+    pub fn open(parameters: WindowParameters) -> Window {
         let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
         glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
-        glfw.window_hint(glfw::WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
+        glfw.window_hint(glfw::WindowHint::OpenGlProfile(
+            glfw::OpenGlProfileHint::Core,
+        ));
         glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
-    
-        let (mut window, events) = glfw.create_window(parameters.width, parameters.height, &parameters.title, glfw::WindowMode::Windowed).expect("Failed to create GLFW window");
+
+        let (mut window, events) = glfw
+            .create_window(
+                parameters.width,
+                parameters.height,
+                &parameters.title,
+                glfw::WindowMode::Windowed,
+            )
+            .expect("Failed to create GLFW window");
 
         window.make_current();
         window.set_key_polling(true);
         window.set_framebuffer_size_polling(true);
-    
+
         gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
 
-        Window { window, glfw, events }
+        Window {
+            window,
+            glfw,
+            events,
+        }
     }
 
     pub fn process_events(&mut self) -> Vec<glfw::WindowEvent> {
@@ -38,13 +51,13 @@ impl Window{
 
         for (_, event) in glfw::flush_messages(&self.events) {
             match event {
-                glfw::WindowEvent::FramebufferSize(width, height) => {
-                    unsafe { gl::Viewport(0, 0, width, height) }
+                glfw::WindowEvent::FramebufferSize(width, height) => unsafe {
+                    gl::Viewport(0, 0, width, height)
+                },
+                glfw::WindowEvent::Key(_, _, _, _) => {
+                    events.push(event);
                 }
-                glfw::WindowEvent::Key(_, _, _, _) => { 
-                    events.push(event); 
-                }
-                _ => {  }
+                _ => {}
             }
         }
 
@@ -57,7 +70,7 @@ impl Window{
         self.window.swap_buffers();
     }
 
-    pub fn should_close(&self) -> bool{
+    pub fn should_close(&self) -> bool {
         self.window.should_close()
     }
 }

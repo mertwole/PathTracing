@@ -6,12 +6,16 @@ pub struct Plane {
     point: Vec3,
     normal: Vec3,
 
-    material_id: usize
+    material_id: usize,
 }
 
 impl Plane {
     pub fn new(point: Vec3, normal: Vec3, material_id: usize) -> Plane {
-        Plane { point, normal : normal.normalized(), material_id }
+        Plane {
+            point,
+            normal: normal.normalized(),
+            material_id,
+        }
     }
 }
 
@@ -27,17 +31,21 @@ impl Raytraceable for Plane {
         //   =>
         //t = Dot(N, V[0] - Source) / Dot(N, Direction)
         //Dot(N, Direction) == 0 when Normal is perpendicular to direction => Direction parrallel to plane
-        let t = self.normal.dot(&(&self.point - &ray.source)) / self.normal.dot(&ray.direction);
+        let t = self.normal.dot(self.point - ray.source) / self.normal.dot(ray.direction);
 
         if t < ray.min || t > ray.max {
             return result;
         }
 
         result.hit = true;
-        result.point = &ray.source + &(&ray.direction * t);
-        let normal_facing_dir = if ray.direction.dot(&self.normal) > 0.0 { -1.0 } else { 1.0 };
+        result.point = ray.source + ray.direction * t;
+        let normal_facing_dir = if ray.direction.dot(self.normal) > 0.0 {
+            -1.0
+        } else {
+            1.0
+        };
         result.hit_inside = normal_facing_dir < 0.0;
-        result.normal = &self.normal * normal_facing_dir;
+        result.normal = self.normal * normal_facing_dir;
         result.t = t;
         result.material_id = self.material_id;
 

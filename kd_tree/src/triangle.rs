@@ -7,22 +7,22 @@ pub struct Triangle {
 
 impl Triangle {
     pub fn check_with_aabb(&self, aabb: &AABB) -> bool {
-        let aabb_vertices: [&Vec3; 8] = [
-            &aabb.min,
-            &Vec3::new(aabb.max.x, aabb.min.y, aabb.min.z),
-            &Vec3::new(aabb.max.x, aabb.min.y, aabb.max.z),
-            &Vec3::new(aabb.min.x, aabb.min.y, aabb.max.z),
-            &Vec3::new(aabb.min.x, aabb.max.y, aabb.max.z),
-            &Vec3::new(aabb.min.x, aabb.max.y, aabb.min.z),
-            &Vec3::new(aabb.max.x, aabb.max.y, aabb.min.z),
-            &aabb.max,
+        let aabb_vertices: [Vec3; 8] = [
+            aabb.min,
+            Vec3::new(aabb.max.x, aabb.min.y, aabb.min.z),
+            Vec3::new(aabb.max.x, aabb.min.y, aabb.max.z),
+            Vec3::new(aabb.min.x, aabb.min.y, aabb.max.z),
+            Vec3::new(aabb.min.x, aabb.max.y, aabb.max.z),
+            Vec3::new(aabb.min.x, aabb.max.y, aabb.min.z),
+            Vec3::new(aabb.max.x, aabb.max.y, aabb.min.z),
+            aabb.max,
         ];
         //facets are: 0-1-2-3||4-5-6-7||1-2-7-6||2-3-4-7||0-3-4-5||0-1-6-5
 
         //plane equality is normal.x * x + normal.y * y + normal.z * z + d = 0
         let triangle_normal =
-            (&self.points[0] - &self.points[1]).cross(&(&self.points[0] - &self.points[2]));
-        let triangle_d = -triangle_normal.dot(&self.points[0]);
+            (self.points[0] - self.points[1]).cross(self.points[0] - self.points[2]);
+        let triangle_d = -triangle_normal.dot(self.points[0]);
 
         let mut intersection = false;
 
@@ -48,7 +48,7 @@ impl Triangle {
 
         let check_box_side = |point_ids: [usize; 3], opposite_side_point_id: usize| {
             let normal = (aabb_vertices[point_ids[0]] - aabb_vertices[point_ids[1]])
-                .cross(&(aabb_vertices[point_ids[0]] - aabb_vertices[point_ids[2]]));
+                .cross(aabb_vertices[point_ids[0]] - aabb_vertices[point_ids[2]]);
             let d = -normal.dot(aabb_vertices[point_ids[0]]);
 
             let triangle_side = if normal.dot(aabb_vertices[opposite_side_point_id]) + d < 0.0 {
@@ -57,7 +57,7 @@ impl Triangle {
                 -1
             };
             for i in 0..3 {
-                let triangle_dot_side = normal.dot(&self.points[i]) + d;
+                let triangle_dot_side = normal.dot(self.points[i]) + d;
                 if small_enought(triangle_dot_side) {
                     continue;
                 }

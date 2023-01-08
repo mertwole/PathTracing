@@ -11,6 +11,6 @@ pub use self::kd_tree::*;
 
 use std::marker::{Send, Sync};
 
-pub trait Raytraceable : Send + Sync {
+pub trait Raytraceable: Send + Sync {
     fn trace_ray(&self, ray: &Ray) -> RayTraceResult;
 }

@@ -62,7 +62,7 @@ impl OBJLoader {
                 let mut vert = Vec3::new(x, y, z);
                 match coords_iter.next() {
                     Some(w) => {
-                        vert = &vert / w.parse::<f32>().unwrap();
+                        vert = vert / w.parse::<f32>().unwrap();
                     }
                     _ => {}
                 }
