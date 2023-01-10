@@ -1,14 +1,21 @@
-use super::{GetColorResult, Material};
-use crate::raytraceable::RayTraceResult;
-use math::Vec3;
 use rand::*;
+use serde::{Deserialize, Serialize};
 
+use math::Vec3;
+
+use super::{GetColorResult, Material, MaterialUninit};
+use crate::raytraceable::RayTraceResult;
+
+#[derive(Deserialize, Serialize)]
+#[serde(default)]
 pub struct PBRMaterial {
     albedo: Vec3,
     roughness: f32,
     metallic: f32,
     // Precomputed
+    #[serde(skip)]
     f0: Vec3,
+    #[serde(skip)]
     roughness_sqr: f32,
 }
 
@@ -88,12 +95,21 @@ impl PBRMaterial {
     }
 }
 
+#[typetag::serde(name = "pbr")]
+impl MaterialUninit for PBRMaterial {
+    fn init(mut self: Box<Self>) -> Box<dyn Material> {
+        self.f0 = self.albedo * self.metallic + Vec3::new_xyz(0.04) * (1.0 - self.metallic);
+        self.roughness_sqr = self.roughness.powi(2);
+        self
+    }
+}
+
 impl Material for PBRMaterial {
     fn get_color(&self, dir: Vec3, trace_result: &RayTraceResult) -> GetColorResult {
         let input_dir = dir * -1.0;
 
-        let rand_0 = thread_rng().gen_range(0.0, 1.0);
-        let rand_1 = thread_rng().gen_range(0.0, 1.0);
+        let rand_0 = thread_rng().gen_range(0.0..1.0);
+        let rand_1 = thread_rng().gen_range(0.0..1.0);
 
         let (mul, output_dir, selection_probability) = if thread_rng().gen_bool(0.5) {
             // Diffuse

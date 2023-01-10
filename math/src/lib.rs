@@ -1,11 +1,12 @@
+use serde::{Deserialize, Serialize};
 use std::ops;
 
 pub const EPSILON: f32 = 0.0001;
 pub const PI: f32 = 3.14159265359;
 pub const INV_PI: f32 = 0.31830988618;
 
-// region UVec2
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(expecting = "expecting [<x>, <y>] array")]
 pub struct UVec2 {
     pub x: usize,
     pub y: usize,
@@ -66,9 +67,6 @@ impl ops::Div<usize> for UVec2 {
     }
 }
 
-// endregion
-
-// region HdrColor
 #[derive(Clone, Copy, Default)]
 pub struct HdrColor(Vec3);
 
@@ -78,9 +76,6 @@ impl HdrColor {
     }
 }
 
-// endregion
-
-// region Color24bpprgb
 #[derive(Clone, Copy, Default)]
 pub struct Color24bpprgb {
     pub r: u8,
@@ -94,7 +89,7 @@ impl Color24bpprgb {
     }
 
     pub fn from_hdr_tone_mapped(hdr: HdrColor) -> Color24bpprgb {
-        let mut tone_mapped = hdr.0 / (hdr.0 + Vec3::new_xyz(1.0));
+        let tone_mapped = hdr.0 / (hdr.0 + Vec3::new_xyz(1.0));
         Color24bpprgb::from_normalized(tone_mapped.x, tone_mapped.y, tone_mapped.z)
     }
 
@@ -107,10 +102,8 @@ impl Color24bpprgb {
     }
 }
 
-// endregion
-
-// region Vec2
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(expecting = "expecting [<x>, <y>] array")]
 pub struct Vec2 {
     pub x: f32,
     pub y: f32,
@@ -186,10 +179,9 @@ impl ops::Div<f32> for Vec2 {
         Vec2::new(self.x / rhs, self.y / rhs)
     }
 }
-// endregion
 
-// region Vec3
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(expecting = "expecting [<x>, <y>, <z>] array")]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,
@@ -336,14 +328,12 @@ impl ops::Div<f32> for Vec3 {
     }
 }
 
-// endregion
-
-// region Mat3
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(expecting = "expecting [<row0>, <row1>, <row2>] array")]
 pub struct Mat3 {
-    row0: Vec3,
-    row1: Vec3,
-    row2: Vec3,
+    pub row0: Vec3,
+    pub row1: Vec3,
+    pub row2: Vec3,
 }
 
 impl Mat3 {
@@ -441,5 +431,3 @@ impl ops::Mul<Mat3> for Mat3 {
         )
     }
 }
-
-// endregion

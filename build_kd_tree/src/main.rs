@@ -1,5 +1,3 @@
-extern crate kd_tree;
-
 use kd_tree::tree::*;
 
 fn main() {

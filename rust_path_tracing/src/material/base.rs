@@ -1,8 +1,13 @@
-use super::{GetColorResult, Material};
-use crate::raytraceable::RayTraceResult;
-use math::Vec3;
 use rand::*;
+use serde::{Deserialize, Serialize};
 
+use math::Vec3;
+
+use super::{GetColorResult, Material, MaterialUninit};
+use crate::raytraceable::RayTraceResult;
+
+#[derive(Deserialize, Serialize)]
+#[serde(default)]
 pub struct BaseMaterial {
     pub color: Vec3,
     pub emission: Vec3,
@@ -42,9 +47,16 @@ impl BaseMaterial {
     }
 }
 
+#[typetag::serde(name = "base")]
+impl MaterialUninit for BaseMaterial {
+    fn init(self: Box<Self>) -> Box<dyn Material> {
+        self
+    }
+}
+
 impl Material for BaseMaterial {
     fn get_color(&self, dir: Vec3, trace_result: &RayTraceResult) -> GetColorResult {
-        let random_num = thread_rng().gen_range(0.0, 1.0);
+        let random_num = thread_rng().gen_range(0.0..1.0);
         if random_num < self.reflective {
             // reflect
             GetColorResult::NextRayColorMultiplierAndDirection(
@@ -66,7 +78,7 @@ impl Material for BaseMaterial {
 
             //return GetColorResult::Color(Vec3::new_xyz(fresnel));
 
-            let rand = thread_rng().gen_range(0.0, 1.0);
+            let rand = thread_rng().gen_range(0.0..1.0);
             let new_dir = if rand < fresnel {
                 // reflect
                 dir.reflect(trace_result.normal)
@@ -86,8 +98,8 @@ impl Material for BaseMaterial {
         } else {
             // diffuse
             let mut new_direction = Vec3::random_on_unit_sphere(
-                thread_rng().gen_range(0.0, 1.0),
-                thread_rng().gen_range(0.0, 1.0),
+                thread_rng().gen_range(0.0..1.0),
+                thread_rng().gen_range(0.0..1.0),
             );
 
             if new_direction.dot(trace_result.normal) < 0.0 {

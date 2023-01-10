@@ -1,7 +1,5 @@
-pub mod tree;
 pub mod aabb;
+pub mod tree;
 
 mod obj_loader;
 mod triangle;
-
-extern crate math;

@@ -1,77 +1,81 @@
-use crate::camera::*;
-use crate::material::*;
-use crate::raytraceable::*;
-use math::*;
-
-mod work_group;
-use work_group::*;
-mod image_buffer;
-
-extern crate num_cpus;
-extern crate threadpool;
-
+use serde::Deserialize;
 use std::sync::mpsc::channel;
 use threadpool::ThreadPool;
 
-pub struct Scene {
-    camera: Camera,
+use crate::material::{self, Material, MaterialUninit};
+use crate::raytraceable::Raytraceable;
+use math::{Color24bpprgb, UVec2};
+
+pub mod camera;
+mod image_buffer;
+mod work_group;
+
+use camera::Camera;
+use work_group::WorkGroup;
+
+#[derive(Deserialize)]
+struct SceneConfig {
     num_threads: usize,
     trace_depth: usize,
     workgroup_size: UVec2,
-    workgroup_count: UVec2,
+}
 
+pub type Scene = SceneGeneric<Box<dyn Material>>;
+
+#[derive(Deserialize)]
+#[serde(transparent)]
+struct SceneUninit(SceneGeneric<Box<dyn MaterialUninit>>);
+
+#[derive(Deserialize)]
+pub struct SceneGeneric<M> {
+    config: SceneConfig,
+    camera: Camera,
+    #[serde(skip)]
     primitives: Vec<Box<dyn Raytraceable>>,
-    materials: Vec<Box<dyn Material>>,
+    materials: Vec<M>,
 
+    #[serde(skip)]
+    workgroup_count: UVec2,
+    #[serde(skip)]
     workgroups: Vec<WorkGroup>,
 }
 
 static mut GLOBAL_SCENE_PTR: *const Scene = std::ptr::null();
 
-impl Scene {
-    pub fn new(camera: Camera) -> Scene {
+impl SceneUninit {
+    pub fn init(mut self) -> Scene {
+        let materials = self.0.materials.drain(..).map(|mat| mat.init()).collect();
+
         Scene {
-            camera,
-            num_threads: num_cpus::get(),
-            trace_depth: 8,
-            workgroup_count: UVec2::new(0, 0),
-            workgroup_size: UVec2::new(32, 32),
-            primitives: Vec::new(),
-            materials: Vec::new(),
-            workgroups: Vec::new(),
+            config: self.0.config,
+            camera: self.0.camera,
+            primitives: self.0.primitives,
+            materials,
+            workgroup_count: self.0.workgroup_count,
+            workgroups: self.0.workgroups,
         }
     }
+}
 
-    // region getters and setters
+impl Scene {
+    pub fn from_json(json: &str) -> Scene {
+        let uninit: SceneUninit = serde_json::de::from_str(json).unwrap();
+        let mut init = uninit.init();
+        // @TODO: Move to SceneUninit::init.
+        init.divide_to_workgroups();
+        init
+    }
 
     pub fn add_primitive(&mut self, primitive: Box<dyn Raytraceable>) {
         self.primitives.push(primitive);
     }
 
-    pub fn init_materials(&mut self, materials: Vec<Box<dyn Material>>) {
-        self.materials = materials;
-    }
-
-    pub fn set_workgroup_size(&mut self, width: usize, height: usize) {
-        self.workgroup_size = UVec2::new(width, height);
-    }
-
-    pub fn set_num_threads(&mut self, num_threads: usize) {
-        self.num_threads = num_threads;
-    }
-
-    pub fn set_trace_depth(&mut self, trace_depth: usize) {
-        self.trace_depth = trace_depth;
-    }
-
-    // endregion
-
     fn divide_to_workgroups(&mut self) {
         self.workgroups = Vec::new();
 
         // Number of full-widthed and full-heighted workgroups
-        self.workgroup_count = self.camera.resolution / self.workgroup_size;
-        let remainder = self.camera.resolution - self.workgroup_count * self.workgroup_size;
+        self.workgroup_count = self.camera.resolution / self.config.workgroup_size;
+        let remainder = self.camera.resolution - self.workgroup_count * self.config.workgroup_size;
         if remainder.x != 0 {
             self.workgroup_count.x += 1;
         }
@@ -83,22 +87,22 @@ impl Scene {
             .reserve(self.workgroup_count.x * self.workgroup_count.y);
 
         for row_id in 0..self.workgroup_count.y {
-            let mut row_height = self.workgroup_size.y;
+            let mut row_height = self.config.workgroup_size.y;
             // Last row can be not full-heighted
             if row_id == self.workgroup_count.y && remainder.y != 0 {
                 row_height = remainder.y;
             }
 
             for column_id in 0..self.workgroup_count.x {
-                let mut column_width = self.workgroup_size.x;
+                let mut column_width = self.config.workgroup_size.x;
                 // Last column can be not full-widthed
                 if column_id == self.workgroup_count.x && remainder.x != 0 {
                     column_width = remainder.x;
                 }
 
                 let workgroup = WorkGroup::new(
-                    column_id * self.workgroup_size.x,
-                    row_id * self.workgroup_size.y,
+                    column_id * self.config.workgroup_size.x,
+                    row_id * self.config.workgroup_size.y,
                     column_width,
                     row_height,
                 );
@@ -109,7 +113,7 @@ impl Scene {
     }
 
     pub fn init(&mut self) {
-        self.divide_to_workgroups();
+        // @TODO: Remove this.
         unsafe {
             GLOBAL_SCENE_PTR = self;
         }
@@ -126,18 +130,20 @@ impl Scene {
             std::sync::mpsc::Sender<(WorkGroup, usize)>,
             std::sync::mpsc::Receiver<(WorkGroup, usize)>,
         ) = channel();
-        let pool = ThreadPool::new(self.num_threads);
+        let pool = ThreadPool::new(self.config.num_threads);
 
         for _ in 0..num_iterations {
+            let workgroup_count = self.workgroup_count.x * self.workgroup_count.y;
+
             let mut workgroups_received: Vec<Option<WorkGroup>> = Vec::new();
-            for _ in 0..self.workgroup_count.x * self.workgroup_count.y {
+            for _ in 0..workgroup_count {
                 workgroups_received.push(None);
             }
 
-            for i in 0..self.workgroup_count.x * self.workgroup_count.y {
+            for i in 0..workgroup_count {
                 let tx_ = tx.clone();
                 let mut workgroup = self.workgroups.remove(0);
-                let trace_depth = self.trace_depth;
+                let trace_depth = self.config.trace_depth;
                 pool.execute(move || {
                     unsafe {
                         workgroup.iteration(GLOBAL_SCENE_PTR.as_ref().unwrap(), trace_depth);
@@ -145,7 +151,7 @@ impl Scene {
                     tx_.send((workgroup, i)).unwrap();
                 });
             }
-            for _ in 0..self.workgroup_count.x * self.workgroup_count.y {
+            for _ in 0..workgroup_count {
                 let (workgroup, id) = rx.recv().unwrap();
                 workgroups_received[id] = Some(workgroup);
             }
@@ -168,8 +174,8 @@ impl Scene {
                 for buf_x in 0..workgroup_buffer.len() {
                     for buf_y in 0..workgroup_buffer[0].len() {
                         let buf_pixel = workgroup_buffer[buf_x][buf_y];
-                        let glob_x = x * self.workgroup_size.x + buf_x;
-                        let mut glob_y = y * self.workgroup_size.y + buf_y;
+                        let glob_x = x * self.config.workgroup_size.x + buf_x;
+                        let mut glob_y = y * self.config.workgroup_size.y + buf_y;
                         glob_y = self.camera.resolution.y - glob_y - 1;
                         let glob_adress = glob_x + glob_y * self.camera.resolution.x;
 
@@ -205,8 +211,8 @@ impl Scene {
                 for buf_x in 0..workgroup_buffer.len() {
                     for buf_y in 0..workgroup_buffer[0].len() {
                         let buf_pixel = workgroup_buffer[buf_x][buf_y];
-                        let glob_x = x * self.workgroup_size.x + buf_x;
-                        let glob_y = y * self.workgroup_size.y + buf_y;
+                        let glob_x = x * self.config.workgroup_size.x + buf_x;
+                        let glob_y = y * self.config.workgroup_size.y + buf_y;
                         let glob_adress = glob_x + glob_y * self.camera.resolution.x;
 
                         let buf_color = Color24bpprgb::from_hdr_tone_mapped(buf_pixel);

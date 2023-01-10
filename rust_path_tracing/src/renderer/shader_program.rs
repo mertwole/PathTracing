@@ -1,4 +1,3 @@
-extern crate gl;
 use gl::types::*;
 
 pub struct ShaderProgram {
