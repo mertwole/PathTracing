@@ -1,6 +1,6 @@
-use super::Raytraceable;
-use crate::math::*;
-use crate::ray::*;
+use super::{RayTraceResult, Raytraceable};
+use crate::ray::Ray;
+use math::*;
 
 pub struct Triangle {
     points: [Vec3; 3],

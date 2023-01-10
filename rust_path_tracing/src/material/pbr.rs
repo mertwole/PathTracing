@@ -1,5 +1,7 @@
-use super::*;
-use crate::math::Vec3;
+use super::{GetColorResult, Material};
+use crate::raytraceable::RayTraceResult;
+use math::Vec3;
+use rand::*;
 
 pub struct PBRMaterial {
     albedo: Vec3,
@@ -8,6 +10,12 @@ pub struct PBRMaterial {
     // Precomputed
     f0: Vec3,
     roughness_sqr: f32,
+}
+
+impl Default for PBRMaterial {
+    fn default() -> PBRMaterial {
+        PBRMaterial::new(Vec3::new_xyz(1.0), 0.0, 0.0)
+    }
 }
 
 impl PBRMaterial {
@@ -107,7 +115,7 @@ impl Material for PBRMaterial {
         };
 
         let mul =
-            mul * (output_dir.dot(trace_result.normal) / selection_probability * math::PI * 2.0);
+            mul * (output_dir.dot(trace_result.normal) / selection_probability * math::PI * 1.0);
 
         GetColorResult::NextRayColorMultiplierAndDirection(mul, output_dir)
     }

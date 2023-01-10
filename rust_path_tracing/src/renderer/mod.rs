@@ -1,15 +1,25 @@
+use std::sync::Arc;
+
 use gl::types::*;
 
 mod shader_program;
-use shader_program::*;
+use shader_program::ShaderProgram;
 
-mod window;
-pub use window::*;
+pub mod window;
+use window::Window;
 
-pub struct Renderer {}
+use crate::Framebuffer;
+
+pub struct Renderer {
+    width: u32,
+    height: u32,
+    window: Window,
+}
 
 impl Renderer {
     pub fn new(width: u32, height: u32) -> Renderer {
+        let window = Window::open(width, height);
+
         let frag_bytes = include_bytes!("shaders/screen_image.frag");
         let vert_bytes = include_bytes!("shaders/screen_image.vert");
 
@@ -70,24 +80,22 @@ impl Renderer {
             );
         }
 
-        Renderer {}
+        Renderer {
+            window,
+            width,
+            height,
+        }
     }
 
-    pub fn render_from_raw(
-        &mut self,
-        window: &mut Window,
-        width: u32,
-        height: u32,
-        pixels: *const u32,
-    ) {
+    pub fn render_from_raw(&mut self, pixels: *const u32) {
         unsafe {
             gl::TexSubImage2D(
                 gl::TEXTURE_2D,
                 0,
                 0,
                 0,
-                width as GLsizei,
-                height as GLsizei,
+                self.width as GLsizei,
+                self.height as GLsizei,
                 gl::RGBA,
                 gl::UNSIGNED_BYTE,
                 pixels as *const GLvoid,
@@ -95,6 +103,19 @@ impl Renderer {
             gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
         }
 
-        window.swap_buffers();
+        self.window.swap_buffers();
+    }
+
+    pub fn enter_rendering_loop(mut self, framebuffer: Arc<Framebuffer>) {
+        loop {
+            let _ = self.window.process_events();
+            if self.window.should_close() {
+                break;
+            }
+
+            if let Some(image_pointer) = framebuffer.get_image_pointer() {
+                self.render_from_raw(image_pointer);
+            }
+        }
     }
 }

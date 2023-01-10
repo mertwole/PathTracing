@@ -1,5 +1,7 @@
-use super::*;
-use crate::math::Vec3;
+use super::{GetColorResult, Material};
+use crate::raytraceable::RayTraceResult;
+use math::Vec3;
+use rand::*;
 
 pub struct BaseMaterial {
     pub color: Vec3,
@@ -11,8 +13,8 @@ pub struct BaseMaterial {
     pub refractive: f32,
 }
 
-impl BaseMaterial {
-    pub fn default() -> BaseMaterial {
+impl Default for BaseMaterial {
+    fn default() -> BaseMaterial {
         BaseMaterial {
             color: Vec3::new_xyz(1.0),
             emission: Vec3::new_xyz(1.0),

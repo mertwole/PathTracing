@@ -1,26 +1,4 @@
-use crate::math::*;
-
-pub struct RayTraceResult {
-    pub hit: bool,
-    pub point: Vec3,
-    pub normal: Vec3,
-    pub t: f32,
-    pub material_id: usize,
-    pub hit_inside: bool,
-}
-
-impl RayTraceResult {
-    pub fn void() -> RayTraceResult {
-        RayTraceResult {
-            hit: false,
-            point: Vec3::default(),
-            normal: Vec3::default(),
-            t: 0.0,
-            material_id: 0,
-            hit_inside: false,
-        }
-    }
-}
+use math::*;
 
 pub struct Ray {
     pub source: Vec3,

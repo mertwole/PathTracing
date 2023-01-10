@@ -1,6 +1,8 @@
-extern crate kd_tree;
-extern crate math;
-extern crate rand;
+use std::{
+    cell::RefCell,
+    sync::{Arc, Mutex},
+    thread,
+};
 
 mod camera;
 mod material;
@@ -9,16 +11,12 @@ mod raytraceable;
 mod renderer;
 mod scene;
 
-use camera::*;
-use material::{base::*, pbr::*, *};
-use math::*;
-use raytraceable::*;
-use renderer::*;
-use scene::*;
-
-use std::thread;
-
-static mut FRAMEBUFFER_PTR: *const u32 = std::ptr::null();
+use camera::{BokehShape, Camera};
+use material::{base::BaseMaterial, pbr::PBRMaterial, Material};
+use math::{Mat3, UVec2, Vec3};
+use raytraceable::{plane::Plane, sphere::Sphere};
+use renderer::Renderer;
+use scene::Scene;
 
 fn init_materials(scene: &mut Scene) {
     let mut materials: Vec<Box<dyn Material>> = Vec::new();
@@ -65,7 +63,7 @@ fn init_materials(scene: &mut Scene) {
     let material = PBRMaterial::new(Vec3::new(1.0, 1.0, 1.0), 0.5, 0.0);
     materials.push(Box::new(material));
     // 9th mat
-    let material = PBRMaterial::new(Vec3::new(1.0, 1.0, 1.0), 0.3, 0.5);
+    let material = PBRMaterial::new(Vec3::new(1.0, 1.0, 1.0), 0.1, 0.0);
     materials.push(Box::new(material));
     // 10th mat
     let material = PBRMaterial::new(Vec3::new(1.0, 1.0, 1.0), 0.1, 0.0);
@@ -113,9 +111,9 @@ fn init_primitives(scene: &mut Scene) {
         2,
     )));
 
-    scene.add_primitive(Box::new(Sphere::new(Vec3::new(-1.5, -2.0, 0.0), 1.0, 7)));
-    scene.add_primitive(Box::new(Sphere::new(Vec3::new(0.0, -0.5, 0.0), 0.5, 12)));
-    scene.add_primitive(Box::new(Sphere::new(Vec3::new(1.5, -2.0, 0.0), 1.0, 9)));
+    scene.add_primitive(Box::new(Sphere::new(Vec3::new(-1.0, -2.0, 0.0), 1.0, 9)));
+    scene.add_primitive(Box::new(Sphere::new(Vec3::new(0.0, 0.0, 0.0), 0.5, 12)));
+    scene.add_primitive(Box::new(Sphere::new(Vec3::new(1.0, -2.0, 0.0), 1.0, 9)));
     //scene.add_primitive(Box::new(Sphere::new(Vec3::new(1.0, 0.0, 0.0), 0.5, 10)));
     //scene.add_primitive(Box::new(Sphere::new(Vec3::new(2.0, 0.0, 0.0), 1.0, 11)));
 
@@ -123,6 +121,32 @@ fn init_primitives(scene: &mut Scene) {
     // kd_tree.load(&"data/stanford-dragon.obj".to_string(), &"data/stanford-dragon.tree".to_string());
     // kd_tree.load(&"data/cube.obj".to_string(), &"data/cube.tree".to_string());
     // scene.add_primitive(Box::new(kd_tree));
+}
+
+pub struct Framebuffer {
+    data: Mutex<Vec<u32>>,
+}
+
+impl Framebuffer {
+    pub fn new() -> Framebuffer {
+        Framebuffer {
+            data: Mutex::new(vec![]),
+        }
+    }
+
+    pub fn set_image(&self, data: Vec<u32>) {
+        let mut guard = self.data.lock().unwrap();
+        *guard = data;
+    }
+
+    pub fn get_image_pointer(&self) -> Option<*const u32> {
+        let data = self.data.lock().unwrap();
+        if data.len() != 0 {
+            Some((*data).as_ptr() as *const u32)
+        } else {
+            None
+        }
+    }
 }
 
 fn main() {
@@ -150,19 +174,15 @@ fn main() {
     init_materials(&mut scene);
     init_primitives(&mut scene);
 
-    let mut window = Window::open(WindowParameters {
-        width: screen_width,
-        height: screen_height,
-        title: String::from("title"),
-    });
-    let mut renderer = Renderer::new(screen_width, screen_height);
+    let framebuffer = Arc::new(Framebuffer::new());
+    let framebuffer_clone = framebuffer.clone();
+
+    let renderer = Renderer::new(screen_width, screen_height);
 
     let mut reset_render = true;
 
     thread::spawn(move || {
         let mut iterations = 0;
-        let mut raw_img = Vec::new();
-
         loop {
             if reset_render {
                 scene.init();
@@ -172,29 +192,13 @@ fn main() {
             scene.iterations(1);
             println!("iteration {}", iterations);
             iterations += 1;
-            unsafe {
-                FRAMEBUFFER_PTR = std::ptr::null();
-            }
-            raw_img = scene.get_raw_image();
 
-            unsafe {
-                FRAMEBUFFER_PTR = raw_img.as_ptr();
-            }
+            let image = scene.get_raw_image();
+            framebuffer_clone.set_image(image);
         }
     });
 
-    loop {
-        let _ = window.process_events();
-        if window.should_close() {
-            break;
-        }
-
-        unsafe {
-            if !FRAMEBUFFER_PTR.is_null() {
-                renderer.render_from_raw(&mut window, screen_width, screen_height, FRAMEBUFFER_PTR);
-            }
-        }
-    }
+    renderer.enter_rendering_loop(framebuffer);
 
     //scene.save_output(&std::path::Path::new("output.bmp"));
 }

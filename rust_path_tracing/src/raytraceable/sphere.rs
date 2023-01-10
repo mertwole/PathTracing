@@ -1,6 +1,6 @@
-use super::Raytraceable;
-use crate::math::*;
+use super::{RayTraceResult, Raytraceable};
 use crate::ray::*;
+use math::*;
 
 pub struct Sphere {
     center: Vec3,

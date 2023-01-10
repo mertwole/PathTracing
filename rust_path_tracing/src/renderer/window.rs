@@ -1,13 +1,6 @@
 use std::sync::mpsc::Receiver;
 
 use glfw::Context;
-pub use glfw::Key;
-
-pub struct WindowParameters {
-    pub width: u32,
-    pub height: u32,
-    pub title: String,
-}
 
 pub struct Window {
     window: glfw::Window,
@@ -16,7 +9,7 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn open(parameters: WindowParameters) -> Window {
+    pub fn open(width: u32, height: u32) -> Window {
         let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
         glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
         glfw.window_hint(glfw::WindowHint::OpenGlProfile(
@@ -25,12 +18,7 @@ impl Window {
         glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
 
         let (mut window, events) = glfw
-            .create_window(
-                parameters.width,
-                parameters.height,
-                &parameters.title,
-                glfw::WindowMode::Windowed,
-            )
+            .create_window(width, height, &"", glfw::WindowMode::Windowed)
             .expect("Failed to create GLFW window");
 
         window.make_current();

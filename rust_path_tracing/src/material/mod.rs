@@ -1,6 +1,5 @@
-use crate::math::Vec3;
-use crate::rand::*;
-use crate::ray::RayTraceResult;
+use crate::raytraceable::RayTraceResult;
+use math::Vec3;
 use std::marker::{Send, Sync};
 
 pub mod base;

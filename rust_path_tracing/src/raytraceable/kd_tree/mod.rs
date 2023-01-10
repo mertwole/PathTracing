@@ -1,11 +1,12 @@
 mod obj_loader;
 use obj_loader::*;
 
-use kd_tree::aabb::AABB;
-use kd_tree::tree::{Tree, TreeNode};
+use kd_tree::{
+    aabb::AABB,
+    tree::{Tree, TreeNode},
+};
 
-use super::triangle::*;
-use super::Raytraceable;
+use super::{triangle::Triangle, RayTraceResult, Raytraceable};
 use crate::ray::*;
 use math::*;
 
@@ -29,9 +30,22 @@ impl KDTree {
         self.root = Tree::get_tree_from_file(tree_path);
     }
 
+    fn trace_ray_aabb(aabb: &AABB, ray: &Ray) -> bool {
+        let inv_dir = Vec3::new_xyz(1.0) / ray.direction;
+        let t0 = (aabb.min - ray.source) * inv_dir;
+        let t1 = (aabb.max - ray.source) * inv_dir;
+
+        let max_triple = |a: f32, b: f32, c: f32| a.max(b.max(c));
+        let min_triple = |a: f32, b: f32, c: f32| a.min(b.min(c));
+
+        let tmin = max_triple(t0.x.min(t1.x), t0.y.min(t1.y), t0.z.min(t1.z));
+        let tmax = min_triple(t0.x.max(t1.x), t0.y.max(t1.y), t0.z.max(t1.z));
+        tmin <= tmax
+    }
+
     fn trace_ray_recursively(&self, root: &TreeNode, ray: &Ray) -> RayTraceResult {
         let mut result = RayTraceResult::void();
-        if !root.bounding_box.trace_ray(ray) {
+        if !Self::trace_ray_aabb(&root.bounding_box, &ray) {
             return result;
         }
 
@@ -71,33 +85,5 @@ impl Raytraceable for KDTree {
             result.material_id = self.material_id;
         }
         result
-    }
-}
-
-trait RaytraceableBool {
-    fn trace_ray(&self, ray: &Ray) -> bool;
-}
-
-fn max_triple(a: f32, b: f32, c: f32) -> f32 {
-    a.max(b.max(c))
-}
-
-fn min_triple(a: f32, b: f32, c: f32) -> f32 {
-    a.min(b.min(c))
-}
-
-impl RaytraceableBool for AABB {
-    fn trace_ray(&self, ray: &Ray) -> bool {
-        let inv_dir = Vec3::new_xyz(1.0) / ray.direction;
-        let t0 = (self.min - ray.source) * inv_dir;
-        let t1 = (self.max - ray.source) * inv_dir;
-
-        let tmin = max_triple(t0.x.min(t1.x), t0.y.min(t1.y), t0.z.min(t1.z));
-        let tmax = min_triple(t0.x.max(t1.x), t0.y.max(t1.y), t0.z.max(t1.z));
-        if tmin > tmax {
-            return false;
-        }
-        //return (tmin > ray.min && tmin < ray.max) || (tmax > ray.min && tmax < ray.max)
-        true
     }
 }

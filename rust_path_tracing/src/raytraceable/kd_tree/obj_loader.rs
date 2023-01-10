@@ -1,5 +1,5 @@
-use crate::math::Vec3;
-use crate::triangle::*;
+use crate::raytraceable::triangle::Triangle;
+use math::Vec3;
 
 use std::fs::File;
 use std::io::prelude::*;

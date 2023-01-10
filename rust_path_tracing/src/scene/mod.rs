@@ -1,7 +1,7 @@
 use crate::camera::*;
 use crate::material::*;
-use crate::math::*;
 use crate::raytraceable::*;
+use math::*;
 
 mod work_group;
 use work_group::*;

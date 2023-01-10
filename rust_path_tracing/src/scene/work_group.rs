@@ -1,8 +1,9 @@
 use super::image_buffer::*;
-use super::Scene;
 use crate::material::*;
-use crate::math::*;
-use crate::ray::{Ray, RayTraceResult};
+use crate::ray::Ray;
+use crate::raytraceable::RayTraceResult;
+use crate::scene::Scene;
+use math::*;
 
 pub struct WorkGroup {
     iteration: usize,

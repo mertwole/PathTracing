@@ -1,6 +1,6 @@
-use crate::math::*;
-use crate::rand::*;
 use crate::ray::*;
+use math::*;
+use rand::*;
 
 pub enum BokehShape {
     Point,
@@ -62,7 +62,6 @@ impl Camera {
         let objective_sample = self.bokeh_shape.sample() * self.bokeh_size;
         point_on_objective.x += objective_sample.x;
         point_on_objective.y += objective_sample.y;
-        //point_on_objective.z += self.focal_length;
 
         let direction = self.rotation * (watch_dot - point_on_objective);
 
