@@ -1,7 +1,12 @@
-use super::{RayTraceResult, Raytraceable};
-use crate::ray::*;
-use math::*;
+use serde::{Deserialize, Serialize};
 
+use math::Vec3;
+
+use super::{RayTraceResult, Raytraceable, RaytraceableUninit};
+use crate::ray::Ray;
+
+#[derive(Deserialize, Serialize, Default)]
+#[serde(default)]
 pub struct Sphere {
     center: Vec3,
     radius: f32,
@@ -18,6 +23,14 @@ impl Sphere {
             radius_sqr: radius * radius,
             material_id,
         }
+    }
+}
+
+#[typetag::serde(name = "sphere")]
+impl RaytraceableUninit for Sphere {
+    fn init(mut self: Box<Self>) -> Box<dyn Raytraceable> {
+        self.radius_sqr = self.radius.powi(2);
+        self
     }
 }
 

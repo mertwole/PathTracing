@@ -1,7 +1,12 @@
-use super::{RayTraceResult, Raytraceable};
-use crate::ray::*;
-use math::*;
+use serde::{Deserialize, Serialize};
 
+use math::Vec3;
+
+use super::{RayTraceResult, Raytraceable, RaytraceableUninit};
+use crate::ray::Ray;
+
+#[derive(Deserialize, Serialize, Default)]
+#[serde(default)]
 pub struct Plane {
     point: Vec3,
     normal: Vec3,
@@ -16,6 +21,14 @@ impl Plane {
             normal: normal.normalized(),
             material_id,
         }
+    }
+}
+
+#[typetag::serde(name = "plane")]
+impl RaytraceableUninit for Plane {
+    fn init(mut self: Box<Self>) -> Box<dyn Raytraceable> {
+        self.normal = self.normal.normalized();
+        self
     }
 }
 

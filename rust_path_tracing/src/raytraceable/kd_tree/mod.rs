@@ -16,6 +16,16 @@ pub struct KDTree {
     material_id: usize,
 }
 
+impl Default for KDTree {
+    fn default() -> Self {
+        KDTree {
+            triangles: Vec::new(),
+            root: TreeNode::new(),
+            material_id: 0,
+        }
+    }
+}
+
 impl KDTree {
     pub fn new(material_id: usize) -> KDTree {
         KDTree {

@@ -33,6 +33,11 @@ impl RayTraceResult {
     }
 }
 
+#[typetag::serde(tag = "type")]
+pub trait RaytraceableUninit {
+    fn init(self: Box<Self>) -> Box<dyn Raytraceable>;
+}
+
 pub trait Raytraceable: Send + Sync {
     fn trace_ray(&self, ray: &Ray) -> RayTraceResult;
 }

@@ -1,8 +1,9 @@
-use super::image_buffer::*;
+use std::sync::Arc;
+
+use super::{image_buffer::*, SceneData};
 use crate::material::*;
 use crate::ray::Ray;
 use crate::raytraceable::RayTraceResult;
-use crate::scene::Scene;
 use math::*;
 
 pub struct WorkGroup {
@@ -23,11 +24,11 @@ impl WorkGroup {
         }
     }
 
-    fn trace_ray(&self, scene: &Scene, ray: &Ray) -> RayTraceResult {
+    fn trace_ray(&self, scene_data: Arc<SceneData>, ray: &Ray) -> RayTraceResult {
         let mut result = RayTraceResult::void();
         result.t = std::f32::MAX;
 
-        for primitive in &scene.primitives {
+        for primitive in &scene_data.primitives {
             let primitive_result = primitive.trace_ray(ray);
             if primitive_result.hit && primitive_result.t < result.t {
                 result = primitive_result;
@@ -37,17 +38,17 @@ impl WorkGroup {
         result
     }
 
-    fn get_color(&mut self, scene: &Scene, ray: &Ray, max_depth: usize) -> Vec3 {
+    fn get_color(&mut self, scene_data: Arc<SceneData>, ray: &Ray, max_depth: usize) -> Vec3 {
         if max_depth == 0 {
             return Vec3::default();
         }
 
-        let trace_result = self.trace_ray(scene, ray);
+        let trace_result = self.trace_ray(scene_data.clone(), ray);
         if !trace_result.hit {
             return Vec3::default();
         }
 
-        let material = scene.materials[trace_result.material_id].as_ref();
+        let material = scene_data.materials[trace_result.material_id].as_ref();
         let color_result = material.get_color(ray.direction, &trace_result);
 
         match color_result {
@@ -55,18 +56,18 @@ impl WorkGroup {
             GetColorResult::NextRayColorMultiplierAndDirection(mul, dir) => {
                 let ray_start = trace_result.point + dir * math::EPSILON;
                 let new_ray = Ray::new(ray_start, dir, math::EPSILON, std::f32::MAX);
-                mul * self.get_color(scene, &new_ray, max_depth - 1)
+                mul * self.get_color(scene_data, &new_ray, max_depth - 1)
             }
         }
     }
 
-    pub fn iteration(&mut self, scene: &Scene, trace_depth: usize) {
+    pub fn iteration(&mut self, scene_data: Arc<SceneData>, trace_depth: usize) {
         for x in 0..self.buffer.width {
             for y in 0..self.buffer.height {
-                let ray = &scene
+                let ray = &scene_data
                     .camera
                     .get_ray(UVec2::new(self.x_offset + x, self.y_offset + y));
-                let color = self.get_color(scene, ray, trace_depth);
+                let color = self.get_color(scene_data.clone(), ray, trace_depth);
                 let pixel = self.buffer.get_pixel_mut(x, y);
                 *pixel = *pixel + color;
             }
