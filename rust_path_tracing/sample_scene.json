@@ -51,32 +51,27 @@
             ]
         },
         {
-            "type": "base",
-            "color": [
-                1.0,
-                0.0,
-                0.0
-            ]
-        },
-        {
-            "type": "base",
-            "color": [
-                0.0,
-                1.0,
-                0.0
-            ]
+            "type": "base"
         },
         {
             "type": "base"
         },
         {
-            "type": "pbr",
-            "albedo": [
-                1.0,
-                1.0,
-                1.0
-            ],
-            "roughness": 0.1
+            "type": "base",
+            "color": {
+                "type": "texture",
+                "path": "./test_texture_1.png",
+                "uv_mode": "repeat"
+            }
+        },
+        {
+            "type": "base",
+            "color": {
+                "type": "texture",
+                "path": "./test_texture_0.png",
+                "uv_mode": "repeat"
+            },
+            "reflective": 0.5
         }
     ],
     "primitives": [
@@ -92,6 +87,16 @@
                 1.0,
                 0.0
             ],
+            "tangent": [
+                0.0,
+                0.0,
+                -1.0
+            ],
+            "bitangent": [
+                1.0,
+                0.0,
+                0.0
+            ],
             "material_id": 3
         },
         {
@@ -104,6 +109,16 @@
             "normal": [
                 0.0,
                 -1.0,
+                0.0
+            ],
+            "tangent": [
+                0.0,
+                0.0,
+                -1.0
+            ],
+            "bitangent": [
+                1.0,
+                0.0,
                 0.0
             ],
             "material_id": 0
@@ -120,6 +135,16 @@
                 0.0,
                 1.0
             ],
+            "tangent": [
+                0.0,
+                1.0,
+                0.0
+            ],
+            "bitangent": [
+                1.0,
+                0.0,
+                0.0
+            ],
             "material_id": 3
         },
         {
@@ -133,6 +158,16 @@
                 1.0,
                 0.0,
                 0.0
+            ],
+            "tangent": [
+                0.0,
+                1.0,
+                0.0
+            ],
+            "bitangent": [
+                0.0,
+                0.0,
+                -1.0
             ],
             "material_id": 1
         },
@@ -148,6 +183,16 @@
                 0.0,
                 0.0
             ],
+            "tangent": [
+                0.0,
+                1.0,
+                0.0
+            ],
+            "bitangent": [
+                0.0,
+                0.0,
+                1.0
+            ],
             "material_id": 2
         },
         {
@@ -161,23 +206,29 @@
             "material_id": 0
         },
         {
-            "type": "sphere",
-            "center": [
-                -1.0,
-                -2.0,
-                0.0
+            "type": "triangle",
+            "points": [
+                [
+                    -2.0,
+                    -2.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    2.0,
+                    0.0
+                ],
+                [
+                    2.0,
+                    -2.0,
+                    0.0
+                ]
             ],
-            "radius": 1.0,
-            "material_id": 4
-        },
-        {
-            "type": "sphere",
-            "center": [
-                1.0,
-                -2.0,
-                0.0
+            "normal": [
+                0.0,
+                0.0,
+                1.0
             ],
-            "radius": 1.0,
             "material_id": 4
         }
     ]

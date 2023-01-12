@@ -1,33 +1,31 @@
 use serde::{Deserialize, Serialize};
 
-use math::Vec3;
+use math::{Vec2, Vec3};
 
 use super::{RayTraceResult, Raytraceable, RaytraceableUninit};
 use crate::ray::Ray;
 
-#[derive(Deserialize, Serialize, Default)]
-#[serde(default)]
+#[derive(Deserialize, Serialize)]
 pub struct Plane {
     point: Vec3,
     normal: Vec3,
+    tangent: Vec3,
+    bitangent: Vec3,
 
     material_id: usize,
-}
-
-impl Plane {
-    pub fn new(point: Vec3, normal: Vec3, material_id: usize) -> Plane {
-        Plane {
-            point,
-            normal: normal.normalized(),
-            material_id,
-        }
-    }
 }
 
 #[typetag::serde(name = "plane")]
 impl RaytraceableUninit for Plane {
     fn init(mut self: Box<Self>) -> Box<dyn Raytraceable> {
         self.normal = self.normal.normalized();
+        self.tangent = self.tangent.normalized();
+        self.bitangent = self.bitangent.normalized();
+
+        assert!(self.normal.dot(self.tangent).abs() < 0.001);
+        assert!(self.normal.dot(self.bitangent).abs() < 0.001);
+        assert!(self.tangent.dot(self.bitangent).abs() < 0.001);
+
         self
     }
 }
@@ -52,13 +50,13 @@ impl Raytraceable for Plane {
 
         result.hit = true;
         result.point = ray.source + ray.direction * t;
-        let normal_facing_dir = if ray.direction.dot(self.normal) > 0.0 {
-            -1.0
-        } else {
-            1.0
-        };
+        let normal_facing_dir = -ray.direction.dot(self.normal).signum();
+
         result.hit_inside = normal_facing_dir < 0.0;
         result.normal = self.normal * normal_facing_dir;
+        let uv = result.point - self.point;
+        // Project onto plane's surface.
+        result.uv = Vec2::new(uv.dot(self.bitangent), uv.dot(self.tangent));
         result.t = t;
         result.material_id = self.material_id;
 

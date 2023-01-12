@@ -3,13 +3,19 @@ use serde::{Deserialize, Serialize};
 
 use math::Vec3;
 
-use super::{GetColorResult, Material, MaterialUninit};
+use super::{
+    material_input::{MaterialInput, MaterialInputUninit},
+    GetColorResult, Material, MaterialUninit,
+};
 use crate::raytraceable::RayTraceResult;
+
+pub type BaseMaterial = BaseMaterialGeneric<MaterialInput>;
+type BaseMaterialUninit = BaseMaterialGeneric<MaterialInputUninit>;
 
 #[derive(Deserialize, Serialize)]
 #[serde(default)]
-pub struct BaseMaterial {
-    pub color: Vec3,
+pub struct BaseMaterialGeneric<T> {
+    pub color: T,
     pub emission: Vec3,
     pub refraction: f32,
 
@@ -18,10 +24,10 @@ pub struct BaseMaterial {
     pub refractive: f32,
 }
 
-impl Default for BaseMaterial {
-    fn default() -> BaseMaterial {
-        BaseMaterial {
-            color: Vec3::new_xyz(1.0),
+impl Default for BaseMaterialUninit {
+    fn default() -> BaseMaterialUninit {
+        BaseMaterialUninit {
+            color: MaterialInputUninit::default(),
             emission: Vec3::new_xyz(1.0),
             refraction: 1.0,
             reflective: 0.0,
@@ -48,9 +54,17 @@ impl BaseMaterial {
 }
 
 #[typetag::serde(name = "base")]
-impl MaterialUninit for BaseMaterial {
+impl MaterialUninit for BaseMaterialUninit {
     fn init(self: Box<Self>) -> Box<dyn Material> {
-        self
+        Box::new(BaseMaterial {
+            color: self.color.init(),
+            emission: self.emission,
+            refraction: self.refraction,
+
+            reflective: self.reflective,
+            emissive: self.emissive,
+            refractive: self.refractive,
+        })
     }
 }
 
@@ -76,8 +90,6 @@ impl Material for BaseMaterial {
             };
             let fresnel = Self::fresnel_reflection(cos, refraction);
 
-            //return GetColorResult::Color(Vec3::new_xyz(fresnel));
-
             let rand = thread_rng().gen_range(0.0..1.0);
             let new_dir = if rand < fresnel {
                 // reflect
@@ -87,7 +99,6 @@ impl Material for BaseMaterial {
                 match dir.refract(trace_result.normal, refraction) {
                     Some(direction) => direction,
                     None => {
-                        //return GetColorResult::Color(Vec3::new(100.0, 0.0, 0.0));
                         let reflected = dir.reflect(trace_result.normal);
                         reflected * if trace_result.hit_inside { -1.0 } else { 1.0 }
                     }
@@ -106,7 +117,8 @@ impl Material for BaseMaterial {
                 new_direction = Vec3::default() - new_direction;
             }
 
-            GetColorResult::NextRayColorMultiplierAndDirection(self.color, new_direction)
+            let color = self.color.sample(trace_result.uv);
+            GetColorResult::NextRayColorMultiplierAndDirection(color, new_direction)
         }
     }
 }

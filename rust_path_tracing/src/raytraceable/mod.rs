@@ -1,5 +1,5 @@
 use crate::ray::Ray;
-use math::Vec3;
+use math::{Vec2, Vec3};
 use std::marker::{Send, Sync};
 
 pub mod sphere;
@@ -13,11 +13,14 @@ pub use self::kd_tree::*;
 
 pub struct RayTraceResult {
     pub hit: bool,
+    pub hit_inside: bool,
+
     pub point: Vec3,
     pub normal: Vec3,
+    pub uv: Vec2,
     pub t: f32,
+
     pub material_id: usize,
-    pub hit_inside: bool,
 }
 
 impl RayTraceResult {
@@ -26,6 +29,7 @@ impl RayTraceResult {
             hit: false,
             point: Vec3::default(),
             normal: Vec3::default(),
+            uv: Vec2::default(),
             t: 0.0,
             material_id: 0,
             hit_inside: false,

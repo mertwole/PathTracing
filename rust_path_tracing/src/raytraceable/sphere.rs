@@ -15,17 +15,6 @@ pub struct Sphere {
     material_id: usize,
 }
 
-impl Sphere {
-    pub fn new(center: Vec3, radius: f32, material_id: usize) -> Sphere {
-        Sphere {
-            center,
-            radius,
-            radius_sqr: radius * radius,
-            material_id,
-        }
-    }
-}
-
 #[typetag::serde(name = "sphere")]
 impl RaytraceableUninit for Sphere {
     fn init(mut self: Box<Self>) -> Box<dyn Raytraceable> {
