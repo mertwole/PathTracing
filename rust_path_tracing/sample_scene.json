@@ -70,8 +70,7 @@
                 "type": "texture",
                 "path": "./test_texture_0.png",
                 "uv_mode": "repeat"
-            },
-            "reflective": 0.5
+            }
         }
     ],
     "primitives": [
@@ -202,12 +201,29 @@
                 0.0,
                 0.0
             ],
-            "radius": 0.5,
-            "material_id": 0
+            "local_space_transform": [
+                [
+                    1.0,
+                    0.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    1.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    1.0
+                ]
+            ],
+            "radius": 2.0,
+            "material_id": 4
         },
         {
             "type": "triangle",
-            "points": [
+            "vertices": [
                 [
                     -2.0,
                     -2.0,
@@ -221,6 +237,20 @@
                 [
                     2.0,
                     -2.0,
+                    0.0
+                ]
+            ],
+            "vertice_uvs": [
+                [
+                    0.0,
+                    0.0
+                ],
+                [
+                    0.5,
+                    1.0
+                ],
+                [
+                    1.0,
                     0.0
                 ]
             ],

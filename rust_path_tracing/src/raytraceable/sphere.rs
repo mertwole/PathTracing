@@ -1,18 +1,33 @@
 use serde::{Deserialize, Serialize};
 
-use math::Vec3;
+use math::{Mat3, Vec2, Vec3};
 
 use super::{RayTraceResult, Raytraceable, RaytraceableUninit};
 use crate::ray::Ray;
 
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Deserialize, Serialize)]
 #[serde(default)]
 pub struct Sphere {
     center: Vec3,
+
+    local_space_transform: Mat3,
+
     radius: f32,
     radius_sqr: f32,
 
     material_id: usize,
+}
+
+impl Default for Sphere {
+    fn default() -> Sphere {
+        Sphere {
+            center: Vec3::default(),
+            local_space_transform: Mat3::identity(),
+            radius: 1.0,
+            radius_sqr: 1.0,
+            material_id: 0,
+        }
+    }
 }
 
 #[typetag::serde(name = "sphere")]
@@ -56,6 +71,12 @@ impl Raytraceable for Sphere {
         result.point = result.t * ray.direction + ray.source;
         let normal_facing_outside = if result.hit_inside { -1.0 } else { 1.0 };
         result.normal = (result.point - self.center) / (self.radius * normal_facing_outside);
+
+        let local_space_normal = self.local_space_transform * result.normal;
+        let u = f32::atan2(local_space_normal.x, local_space_normal.z) / (2.0 * math::PI) + 0.5;
+        let v = f32::asin(local_space_normal.y) / math::PI + 0.5;
+        result.uv = Vec2::new(u * 2.0, v);
+
         result.hit = true;
         result.material_id = self.material_id;
 
