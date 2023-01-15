@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
-use crate::ray::*;
-use math::*;
+use crate::ray::Ray;
+use math::{Mat3, UVec2, Vec2, Vec3};
 use rand::*;
 
 #[derive(Deserialize)]

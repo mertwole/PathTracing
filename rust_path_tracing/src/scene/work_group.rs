@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use super::{image_buffer::*, SceneData};
-use crate::material::*;
+use super::{image_buffer::ImageBuffer, SceneData};
+use crate::material::GetColorResult;
 use crate::ray::Ray;
-use crate::raytraceable::RayTraceResult;
-use math::*;
+use math::{HdrColor, UVec2, Vec3};
 
 pub struct WorkGroup {
     iteration: usize,
@@ -24,26 +23,12 @@ impl WorkGroup {
         }
     }
 
-    fn trace_ray(&self, scene_data: Arc<SceneData>, ray: &Ray) -> RayTraceResult {
-        let mut result = RayTraceResult::void();
-        result.t = std::f32::MAX;
-
-        for primitive in &scene_data.primitives {
-            let primitive_result = primitive.trace_ray(ray);
-            if primitive_result.hit && primitive_result.t < result.t {
-                result = primitive_result;
-            }
-        }
-
-        result
-    }
-
     fn get_color(&mut self, scene_data: Arc<SceneData>, ray: &Ray, max_depth: usize) -> Vec3 {
         if max_depth == 0 {
             return Vec3::default();
         }
 
-        let trace_result = self.trace_ray(scene_data.clone(), ray);
+        let trace_result = scene_data.trace_ray(ray);
         if !trace_result.hit {
             return Vec3::default();
         }

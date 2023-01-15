@@ -14,8 +14,8 @@ type BaseMaterialUninit = BaseMaterialGeneric<MaterialInputUninit>;
 
 #[derive(Deserialize, Serialize)]
 #[serde(default)]
-pub struct BaseMaterialGeneric<T> {
-    pub color: T,
+pub struct BaseMaterialGeneric<I> {
+    pub color: I,
     pub emission: Vec3,
     pub refraction: f32,
 

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use math::{Vec2, Vec3};
 
-use super::{RayTraceResult, Raytraceable, RaytraceableUninit};
+use super::{triangle::Triangle, Bounded, RayTraceResult, Raytraceable, RaytraceableUninit};
 use crate::ray::Ray;
 
 #[derive(Deserialize, Serialize)]
@@ -61,5 +61,13 @@ impl Raytraceable for Plane {
         result.material_id = self.material_id;
 
         result
+    }
+
+    fn is_bounded(&self) -> bool {
+        false
+    }
+
+    fn get_bounded(self: Box<Self>) -> Option<Box<dyn Bounded>> {
+        None
     }
 }

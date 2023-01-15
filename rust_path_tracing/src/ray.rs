@@ -1,4 +1,4 @@
-use math::*;
+use math::Vec3;
 
 pub struct Ray {
     pub source: Vec3,

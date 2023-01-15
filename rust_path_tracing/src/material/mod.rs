@@ -5,8 +5,8 @@ use math::Vec3;
 use crate::raytraceable::RayTraceResult;
 
 pub mod base;
-//pub mod pbr;
 mod material_input;
+pub mod pbr;
 
 pub enum GetColorResult {
     Color(Vec3),

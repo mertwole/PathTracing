@@ -13,20 +13,22 @@ pub type MaterialInput = MaterialInputGeneric<Texture>;
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum MaterialInputGeneric<T> {
-    Color(Vec3),
+    Color { color: Vec3 },
     Texture(T),
 }
 
 impl Default for MaterialInputUninit {
     fn default() -> MaterialInputUninit {
-        MaterialInputUninit::Texture(TextureUninit::default())
+        MaterialInputUninit::Color {
+            color: Vec3::new_xyz(1.0),
+        }
     }
 }
 
 impl MaterialInputUninit {
     pub fn init(self) -> MaterialInput {
         match self {
-            MaterialInputGeneric::Color(color) => MaterialInput::Color(color),
+            MaterialInputGeneric::Color { color } => MaterialInput::Color { color },
             MaterialInputGeneric::Texture(texture) => MaterialInput::Texture(texture.init()),
         }
     }
@@ -35,7 +37,7 @@ impl MaterialInputUninit {
 impl MaterialInput {
     pub fn sample(&self, uv: Vec2) -> Vec3 {
         match self {
-            MaterialInput::Color(color) => *color,
+            MaterialInput::Color { color } => *color,
             MaterialInput::Texture(texture) => texture.sample(uv),
         }
     }

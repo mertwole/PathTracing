@@ -3,51 +3,112 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use threadpool::ThreadPool;
 
-use crate::material::{Material, MaterialUninit};
-use crate::raytraceable::{Raytraceable, RaytraceableUninit};
 use math::{Color24bpprgb, UVec2};
+
+use crate::material::{Material, MaterialUninit};
+use crate::ray::Ray;
+use crate::raytraceable::{RayTraceResult, Raytraceable, RaytraceableUninit};
 
 pub mod camera;
 mod image_buffer;
+mod kd_tree;
 mod work_group;
 
 use camera::Camera;
+use kd_tree::{KdTree, KdTreeConfig};
 use work_group::WorkGroup;
 
 #[derive(Deserialize)]
-struct SceneConfig {
+pub struct SceneConfig {
     num_threads: usize,
     trace_depth: usize,
     workgroup_size: UVec2,
 }
 
-pub type SceneData = SceneDataGeneric<Box<dyn Material>, Box<dyn Raytraceable>>;
-type SceneDataUninit = SceneDataGeneric<Box<dyn MaterialUninit>, Box<dyn RaytraceableUninit>>;
-
 #[derive(Deserialize)]
-pub struct SceneDataGeneric<M, P> {
+struct SceneDataUninit {
+    config: SceneConfig,
+    kd_tree_config: Option<KdTreeConfig>,
+
+    camera: Camera,
+
+    primitives: Vec<Box<dyn RaytraceableUninit>>,
+    materials: Vec<Box<dyn MaterialUninit>>,
+}
+
+struct SceneData {
     config: SceneConfig,
     camera: Camera,
-    primitives: Vec<P>,
-    materials: Vec<M>,
+    kd_tree: Option<KdTree>,
+    primitives: Vec<Box<dyn Raytraceable>>,
+    materials: Vec<Box<dyn Material>>,
 }
 
 impl SceneDataUninit {
     fn init(self) -> SceneData {
+        // @TODO: Specify in config file
+        // @TODO: Add 'Mesh' struct
+        let triangles = crate::obj_loader::OBJLoader::load(std::path::Path::new(&"./cube.obj"), 5);
+
+        let primitives = self
+            .primitives
+            .into_iter()
+            .chain(triangles.into_iter().map(|tr| {
+                let bbox: Box<dyn RaytraceableUninit> = Box::new(tr);
+                bbox
+            }))
+            .map(|primitive| primitive.init());
+
+        let (primitives, kd_tree) = if let Some(kd_tree_config) = self.kd_tree_config {
+            let (primitives_bounded, primitives_unbounded): (Vec<_>, Vec<_>) =
+                primitives.partition(|primitive| primitive.is_bounded());
+
+            let mut kd_tree = KdTree::new(
+                primitives_bounded
+                    .into_iter()
+                    .map(|prim| prim.get_bounded().unwrap())
+                    .collect(),
+                kd_tree_config,
+            );
+            kd_tree.build();
+
+            (primitives_unbounded, Some(kd_tree))
+        } else {
+            (primitives.collect(), None)
+        };
+
         SceneData {
             camera: self.camera,
             config: self.config,
-            primitives: self
-                .primitives
-                .into_iter()
-                .map(|primitive| primitive.init())
-                .collect(),
+            primitives,
+            kd_tree,
             materials: self.materials.into_iter().map(|mat| mat.init()).collect(),
         }
     }
 }
 
 impl SceneData {
+    pub fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
+        let mut result = RayTraceResult::void();
+        result.t = std::f32::MAX;
+
+        if let Some(kd_tree) = &self.kd_tree {
+            let tree_result = kd_tree.trace_ray(ray);
+            if tree_result.hit && tree_result.t < result.t {
+                result = tree_result;
+            }
+        }
+
+        for primitive in &self.primitives {
+            let primitive_result = primitive.trace_ray(ray);
+            if primitive_result.hit && primitive_result.t < result.t {
+                result = primitive_result;
+            }
+        }
+
+        result
+    }
+
     fn divide_to_workgroups(&self) -> (UVec2, Vec<WorkGroup>) {
         let mut workgroups = Vec::new();
 

@@ -7,6 +7,11 @@
             32
         ]
     },
+    "kd_tree_config": {
+        "depth": 8,
+        "sah_samples": 8,
+        "min_primitives_in_node": 8
+    },
     "camera": {
         "resolution": [
             1024,
@@ -51,17 +56,25 @@
             ]
         },
         {
-            "type": "base"
-        },
-        {
-            "type": "base"
+            "type": "base",
+            "color": {
+                "type": "color",
+                "color": [
+                    1.0,
+                    0.0,
+                    0.0
+                ]
+            }
         },
         {
             "type": "base",
             "color": {
-                "type": "texture",
-                "path": "./test_texture_1.png",
-                "uv_mode": "repeat"
+                "type": "color",
+                "color": [
+                    0.0,
+                    1.0,
+                    0.0
+                ]
             }
         },
         {
@@ -71,6 +84,20 @@
                 "path": "./test_texture_0.png",
                 "uv_mode": "repeat"
             }
+        },
+        {
+            "type": "pbr",
+            "albedo": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "roughness": 0.5,
+            "metallic": 0.5
+        },
+        {
+            "type": "base",
+            "reflective": 0.7
         }
     ],
     "primitives": [
@@ -193,73 +220,6 @@
                 1.0
             ],
             "material_id": 2
-        },
-        {
-            "type": "sphere",
-            "center": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "local_space_transform": [
-                [
-                    1.0,
-                    0.0,
-                    0.0
-                ],
-                [
-                    0.0,
-                    1.0,
-                    0.0
-                ],
-                [
-                    0.0,
-                    0.0,
-                    1.0
-                ]
-            ],
-            "radius": 2.0,
-            "material_id": 4
-        },
-        {
-            "type": "triangle",
-            "vertices": [
-                [
-                    -2.0,
-                    -2.0,
-                    0.0
-                ],
-                [
-                    0.0,
-                    2.0,
-                    0.0
-                ],
-                [
-                    2.0,
-                    -2.0,
-                    0.0
-                ]
-            ],
-            "vertice_uvs": [
-                [
-                    0.0,
-                    0.0
-                ],
-                [
-                    0.5,
-                    1.0
-                ],
-                [
-                    1.0,
-                    0.0
-                ]
-            ],
-            "normal": [
-                0.0,
-                0.0,
-                1.0
-            ],
-            "material_id": 4
         }
     ]
 }

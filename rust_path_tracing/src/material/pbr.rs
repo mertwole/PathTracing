@@ -52,23 +52,6 @@ impl PBRMaterial {
         self.f0 + (Vec3::new_xyz(1.0) - self.f0) * (1.0 - hi).powi(5)
     }
 
-    fn brdf(&self, normal: Vec3, input_dir: Vec3, output_dir: Vec3) -> Vec3 {
-        let ni = normal.dot(input_dir);
-        let no = normal.dot(output_dir);
-        let h = (output_dir + input_dir).normalized();
-
-        let geometry = self.geometry(ni) * self.geometry(no);
-        let ndf = self.ndf(normal.dot(h));
-
-        let specular_k = self.fresnel(h.dot(input_dir));
-        let diffuse_k = (Vec3::new_xyz(1.0) - specular_k) * (1.0 - self.metallic);
-
-        let diffuse = math::INV_PI * self.albedo;
-        let specular = geometry * ndf / (4.0 * ni * no);
-
-        specular_k * specular + diffuse_k * diffuse
-    }
-
     fn brdf_diffuse(&self, input_dir: Vec3, output_dir: Vec3) -> Vec3 {
         let h = (output_dir + input_dir).normalized();
 

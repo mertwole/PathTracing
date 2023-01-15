@@ -5,7 +5,7 @@ pub const EPSILON: f32 = 0.0001;
 pub const PI: f32 = 3.14159265359;
 pub const INV_PI: f32 = 0.31830988618;
 
-#[derive(Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Default, Serialize, Deserialize, Debug)]
 #[serde(expecting = "expecting [<x>, <y>] array")]
 pub struct UVec2 {
     pub x: usize,
@@ -102,7 +102,7 @@ impl Color24bpprgb {
     }
 }
 
-#[derive(Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Default, Serialize, Deserialize, Debug)]
 #[serde(expecting = "expecting [<x>, <y>] array")]
 pub struct Vec2 {
     pub x: f32,
@@ -180,7 +180,25 @@ impl ops::Div<f32> for Vec2 {
     }
 }
 
-#[derive(Clone, Copy, Default, Serialize, Deserialize)]
+struct Basis {
+    pub i: Vec3,
+    pub j: Vec3,
+    pub k: Vec3,
+}
+
+impl Basis {
+    fn build_orthonormal_by_j(j: Vec3) -> Basis {
+        let i = if j.y.abs() + j.z.abs() < EPSILON {
+            Vec3::new(-j.y, j.x, 0.0)
+        } else {
+            Vec3::new(0.0, j.z, -j.y)
+        };
+        let k = j.cross(i);
+        Basis { i, j, k }
+    }
+}
+
+#[derive(Clone, Copy, Default, Serialize, Deserialize, Debug)]
 #[serde(expecting = "expecting [<x>, <y>, <z>] array")]
 pub struct Vec3 {
     pub x: f32,
@@ -261,21 +279,28 @@ impl Vec3 {
         let rand_0 = f32::cos(PI * 0.5 * (1.0 - rand_0));
         let theta = rand_1 * PI * 2.0;
 
-        // Without EPSILON ray goes under the surface sometimes.
-        let mut rand = normal * (1.0 - rand_0 + EPSILON);
-        let rand_tangent = if rand.y.abs() + rand.z.abs() < EPSILON {
-            Vec3::new(-rand.y, rand.x, 0.0)
-        } else {
-            Vec3::new(0.0, rand.z, -rand.y)
-        };
-        let rand_tangent = rand_tangent.normalized();
-        let rand_bitangent = rand.cross(rand_tangent);
-
+        let basis = Basis::build_orthonormal_by_j(normal);
         let r = rand_0.sqrt();
-        rand = rand + rand_tangent * r * f32::cos(theta);
-        rand = rand + rand_bitangent * r * f32::sin(theta);
+        // Without EPSILON ray goes under the surface sometimes.
+        let rand = basis.j * (1.0 - rand_0 + EPSILON);
+        rand + r * (basis.i * f32::cos(theta) + basis.k * f32::sin(theta))
+    }
 
-        rand
+    // Angle is in steradians.
+    pub fn random_in_solid_angle(direction: Vec3, angle: f32, rand_0: f32, rand_1: f32) -> Vec3 {
+        let theta = rand_0 * PI * 2.0;
+        let phi = f32::acos((1.0 - rand_1) * f32::cos(angle * 0.25) + rand_1);
+        let x = f32::sin(phi) * f32::cos(theta);
+        let y = f32::sin(phi) * f32::sin(theta);
+        let z = f32::cos(phi);
+        let basis = Basis::build_orthonormal_by_j(direction);
+        x * basis.i + y * basis.j + z * basis.k
+    }
+}
+
+impl Into<Vec3> for [f32; 3] {
+    fn into(self) -> Vec3 {
+        Vec3::new(self[0], self[1], self[2])
     }
 }
 

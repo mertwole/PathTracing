@@ -2,20 +2,20 @@ use serde::{Deserialize, Serialize};
 
 use math::{Mat3, Vec2, Vec3};
 
-use super::{RayTraceResult, Raytraceable, RaytraceableUninit};
+use super::{Bounded, RayTraceResult, Raytraceable, RaytraceableUninit, AABB};
 use crate::ray::Ray;
 
 #[derive(Deserialize, Serialize)]
 #[serde(default)]
 pub struct Sphere {
-    center: Vec3,
+    pub center: Vec3,
 
     local_space_transform: Mat3,
 
-    radius: f32,
+    pub radius: f32,
     radius_sqr: f32,
 
-    material_id: usize,
+    pub material_id: usize,
 }
 
 impl Default for Sphere {
@@ -75,11 +75,31 @@ impl Raytraceable for Sphere {
         let local_space_normal = self.local_space_transform * result.normal;
         let u = f32::atan2(local_space_normal.x, local_space_normal.z) / (2.0 * math::PI) + 0.5;
         let v = f32::asin(local_space_normal.y) / math::PI + 0.5;
-        result.uv = Vec2::new(u * 2.0, v);
+        result.uv = Vec2::new(u, v);
 
         result.hit = true;
         result.material_id = self.material_id;
 
         result
+    }
+
+    fn is_bounded(&self) -> bool {
+        true
+    }
+
+    fn get_bounded(self: Box<Self>) -> Option<Box<dyn Bounded>> {
+        Some(self)
+    }
+}
+
+impl Bounded for Sphere {
+    fn get_bounds(&self) -> AABB {
+        let r_vec = Vec3::new_xyz(self.radius);
+        AABB::new(self.center - r_vec, self.center + r_vec)
+    }
+
+    fn intersect_with_aabb(&self, aabb: &AABB) -> bool {
+        // @TODO
+        true
     }
 }

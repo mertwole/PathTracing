@@ -1,4 +1,4 @@
-use math::*;
+use math::{HdrColor, Vec3};
 
 pub struct ImageBuffer {
     pixels: Vec<Vec3>,
