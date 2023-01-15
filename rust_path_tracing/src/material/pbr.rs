@@ -6,6 +6,7 @@ use math::Vec3;
 use super::{GetColorResult, Material, MaterialUninit};
 use crate::raytraceable::RayTraceResult;
 
+// @TODO: Parametrize all fields with MaterialInput
 #[derive(Deserialize, Serialize)]
 #[serde(default)]
 pub struct PBRMaterial {

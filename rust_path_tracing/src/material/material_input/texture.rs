@@ -13,6 +13,7 @@ enum UvMode {
     Repeat,
 }
 
+// @TODO: Add sipport for different texture formats
 #[derive(Serialize, Deserialize)]
 pub struct TextureGeneric<I> {
     #[serde(rename = "path")]

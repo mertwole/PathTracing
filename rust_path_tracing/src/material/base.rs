@@ -12,6 +12,7 @@ use crate::raytraceable::RayTraceResult;
 pub type BaseMaterial = BaseMaterialGeneric<MaterialInput>;
 type BaseMaterialUninit = BaseMaterialGeneric<MaterialInputUninit>;
 
+// @TODO: Parametrize all fields with MaterialInput
 #[derive(Deserialize, Serialize)]
 #[serde(default)]
 pub struct BaseMaterialGeneric<I> {
