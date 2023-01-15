@@ -361,6 +361,12 @@ pub struct Mat3 {
     pub row2: Vec3,
 }
 
+impl Default for Mat3 {
+    fn default() -> Mat3 {
+        Mat3::identity()
+    }
+}
+
 impl Mat3 {
     pub fn new(row0: Vec3, row1: Vec3, row2: Vec3) -> Mat3 {
         Mat3 { row0, row1, row2 }
@@ -403,9 +409,32 @@ impl Mat3 {
             Vec3::new(0.0, 0.0, 1.0),
         )
     }
+
+    pub fn transponsed_inverse(&self) -> Mat3 {
+        let det = self.row0.x * (self.row1.y * self.row2.z - self.row2.y * self.row1.z)
+            - self.row0.y * (self.row1.x * self.row2.z - self.row1.z * self.row2.x)
+            + self.row0.z * (self.row1.x * self.row2.y - self.row1.y * self.row2.x);
+        Mat3 {
+            row0: Vec3::new(
+                self.row1.y * self.row2.z - self.row2.y * self.row1.z,
+                self.row1.z * self.row2.x - self.row1.x * self.row2.z,
+                self.row1.x * self.row2.y - self.row2.x * self.row1.y,
+            ),
+            row1: Vec3::new(
+                self.row0.z * self.row2.y - self.row0.y * self.row2.z,
+                self.row0.x * self.row2.z - self.row0.z * self.row2.x,
+                self.row2.x * self.row0.y - self.row0.x * self.row2.y,
+            ),
+            row2: Vec3::new(
+                self.row0.y * self.row1.z - self.row0.z * self.row1.y,
+                self.row1.x * self.row0.z - self.row0.x * self.row1.z,
+                self.row0.x * self.row1.y - self.row1.x * self.row0.y,
+            ),
+        } * (1.0 / det)
+    }
 }
 
-impl ops::Mul<Vec3> for Mat3 {
+impl ops::Mul<Vec3> for &Mat3 {
     type Output = Vec3;
     fn mul(self, rhs: Vec3) -> Vec3 {
         Vec3::new(rhs.dot(self.row0), rhs.dot(self.row1), rhs.dot(self.row2))
@@ -454,5 +483,66 @@ impl ops::Mul<Mat3> for Mat3 {
                 self.row2.dot(col2),
             ),
         )
+    }
+}
+
+#[derive(Clone, Copy, Default, Serialize, Deserialize, Debug)]
+#[serde(expecting = "expecting [<x>, <y>, <z>, <w>] array")]
+pub struct Vec4 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32,
+}
+
+impl Vec4 {
+    pub fn new(x: f32, y: f32, z: f32, w: f32) -> Vec4 {
+        Vec4 { x, y, z, w }
+    }
+
+    pub fn from_vec3(vec3: Vec3) -> Vec4 {
+        Vec4 {
+            x: vec3.x,
+            y: vec3.y,
+            z: vec3.z,
+            w: 1.0,
+        }
+    }
+
+    pub fn to_vec3(self) -> Vec3 {
+        Vec3::new(self.x, self.y, self.z)
+    }
+
+    pub fn dot(self, other: Vec4) -> f32 {
+        self.x * other.x + self.y * other.y + self.z * other.z + self.w * other.w
+    }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+#[serde(expecting = "expecting [<row0>, <row1>, <row2>, <row3>] array")]
+pub struct Mat4 {
+    pub row0: Vec4,
+    pub row1: Vec4,
+    pub row2: Vec4,
+    pub row3: Vec4,
+}
+
+impl Mat4 {
+    pub fn normal_matrix(&self) -> Mat3 {
+        let upper_left = Mat3::new(
+            self.row0.to_vec3(),
+            self.row1.to_vec3(),
+            self.row2.to_vec3(),
+        );
+
+        upper_left.transponsed_inverse()
+    }
+}
+
+impl ops::Mul<Vec4> for &Mat4 {
+    type Output = Vec3;
+    fn mul(self, rhs: Vec4) -> Vec3 {
+        let w = rhs.dot(self.row3);
+        Vec3::new(rhs.dot(self.row0), rhs.dot(self.row1), rhs.dot(self.row2)) / w
     }
 }

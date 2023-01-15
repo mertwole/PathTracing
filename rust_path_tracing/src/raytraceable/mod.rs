@@ -2,6 +2,7 @@ use crate::ray::Ray;
 use math::{Vec2, Vec3};
 use std::marker::{Send, Sync};
 
+pub mod mesh;
 pub mod plane;
 pub mod sphere;
 pub mod triangle;

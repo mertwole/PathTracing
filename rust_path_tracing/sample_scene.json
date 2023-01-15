@@ -8,8 +8,8 @@
         ]
     },
     "kd_tree_config": {
-        "depth": 8,
-        "sah_samples": 8,
+        "depth": 16,
+        "sah_samples": 6,
         "min_primitives_in_node": 8
     },
     "camera": {
@@ -97,6 +97,14 @@
         },
         {
             "type": "base",
+            "color": {
+                "type": "color",
+                "color": [
+                    0.0,
+                    0.0,
+                    1.0
+                ]
+            },
             "reflective": 0.7
         }
     ],
@@ -220,6 +228,38 @@
                 1.0
             ],
             "material_id": 2
+        }
+    ],
+    "meshes": [
+        {
+            "path": "./dragon.obj",
+            "transform": [
+                [
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    1.0,
+                    0.0,
+                    -3.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ]
+            ],
+            "material_id": 5
         }
     ]
 }

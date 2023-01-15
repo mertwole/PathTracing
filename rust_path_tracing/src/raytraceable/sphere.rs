@@ -72,7 +72,7 @@ impl Raytraceable for Sphere {
         let normal_facing_outside = if result.hit_inside { -1.0 } else { 1.0 };
         result.normal = (result.point - self.center) / (self.radius * normal_facing_outside);
 
-        let local_space_normal = self.local_space_transform * result.normal;
+        let local_space_normal = &self.local_space_transform * result.normal;
         let u = f32::atan2(local_space_normal.x, local_space_normal.z) / (2.0 * math::PI) + 0.5;
         let v = f32::asin(local_space_normal.y) / math::PI + 0.5;
         result.uv = Vec2::new(u, v);

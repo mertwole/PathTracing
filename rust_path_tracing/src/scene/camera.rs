@@ -69,7 +69,7 @@ impl Camera {
         point_on_objective.x += objective_sample.x;
         point_on_objective.y += objective_sample.y;
 
-        let direction = self.rotation * (watch_dot - point_on_objective);
+        let direction = &self.rotation * (watch_dot - point_on_objective);
 
         let near_plane_dist = direction.length() / self.focal_length * self.near_plane;
 

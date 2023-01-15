@@ -3,11 +3,11 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use threadpool::ThreadPool;
 
-use math::{Color24bpprgb, UVec2, Vec3};
+use math::{Color24bpprgb, UVec2};
 
 use crate::material::{Material, MaterialUninit};
 use crate::ray::Ray;
-use crate::raytraceable::sphere::Sphere;
+use crate::raytraceable::mesh::Mesh;
 use crate::raytraceable::{RayTraceResult, Raytraceable, RaytraceableUninit};
 
 pub mod camera;
@@ -34,6 +34,9 @@ struct SceneDataUninit {
     camera: Camera,
 
     primitives: Vec<Box<dyn RaytraceableUninit>>,
+    #[serde(default)]
+    meshes: Vec<Mesh>,
+
     materials: Vec<Box<dyn MaterialUninit>>,
 }
 
@@ -47,18 +50,13 @@ struct SceneData {
 
 impl SceneDataUninit {
     fn init(self) -> SceneData {
-        // @TODO: Specify in config file
-        // @TODO: Add 'Mesh' struct
-        let triangles = crate::obj_loader::OBJLoader::load(std::path::Path::new(&"./cube.obj"), 5);
+        let mesh_triangles = self.meshes.into_iter().map(|mesh| mesh.init()).flatten();
 
         let primitives = self
             .primitives
             .into_iter()
-            .chain(triangles.into_iter().map(|tr| {
-                let bbox: Box<dyn RaytraceableUninit> = Box::new(tr);
-                bbox
-            }))
-            .map(|primitive| primitive.init());
+            .map(|primitive| primitive.init())
+            .chain(mesh_triangles);
 
         let (primitives, kd_tree) = if let Some(kd_tree_config) = self.kd_tree_config {
             let (primitives_bounded, primitives_unbounded): (Vec<_>, Vec<_>) =

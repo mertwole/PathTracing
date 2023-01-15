@@ -4,7 +4,6 @@ use std::{
 };
 
 mod material;
-pub mod obj_loader;
 mod ray;
 mod raytraceable;
 mod renderer;

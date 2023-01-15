@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use serde::{Deserialize, Serialize};
 
-use math::{Vec2, Vec3};
+use math::{Mat4, Vec2, Vec3, Vec4};
 
 use super::{Bounded, RayTraceResult, Raytraceable, RaytraceableUninit, AABB};
 use crate::ray::Ray;
@@ -50,6 +50,16 @@ impl TriangleUninit {
             vertices,
             true_normal: Vec3::default(),
             material_id,
+        }
+    }
+
+    pub fn transform(&mut self, matrix: &Mat4) {
+        let normal_matrix = &matrix.normal_matrix();
+        for vert in &mut self.vertices {
+            vert.position = matrix * Vec4::from_vec3(vert.position);
+            if let Some(normal) = vert.normal.as_mut() {
+                *normal = (normal_matrix * *normal).normalized();
+            }
         }
     }
 }

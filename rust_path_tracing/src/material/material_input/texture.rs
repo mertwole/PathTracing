@@ -20,16 +20,6 @@ pub struct TextureGeneric<I> {
     uv_mode: UvMode,
 }
 
-impl Default for TextureUninit {
-    fn default() -> TextureUninit {
-        // @TODO: add fallback to include_dir! saved checker MaterialInput
-        TextureUninit {
-            image: "./test_texture_0.png".to_string(),
-            uv_mode: UvMode::Repeat,
-        }
-    }
-}
-
 impl TextureUninit {
     pub fn init(self) -> Texture {
         let image_init = ImageReader::open(&self.image)

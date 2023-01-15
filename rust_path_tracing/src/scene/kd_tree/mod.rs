@@ -33,6 +33,7 @@ impl KdTree {
 
     pub fn build(&mut self) {
         self.init_root();
+        // @TODO: Implement multithreading
         self.root
             .split_recursively(&self.primitives, 0, &self.config);
     }
