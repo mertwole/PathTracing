@@ -99,7 +99,12 @@ impl Bounded for Sphere {
     }
 
     fn intersect_with_aabb(&self, aabb: &AABB) -> bool {
-        // @TODO
-        true
+        let closest_aabb_point = Vec3::new(
+            f32::max(aabb.min.x, f32::min(aabb.max.x, self.center.x)),
+            f32::max(aabb.min.y, f32::min(aabb.max.y, self.center.y)),
+            f32::max(aabb.min.z, f32::min(aabb.max.z, self.center.z)),
+        );
+        let distance_to_center = closest_aabb_point - self.center;
+        distance_to_center.sqr_length() <= self.radius_sqr
     }
 }

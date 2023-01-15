@@ -3,10 +3,11 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use threadpool::ThreadPool;
 
-use math::{Color24bpprgb, UVec2};
+use math::{Color24bpprgb, UVec2, Vec3};
 
 use crate::material::{Material, MaterialUninit};
 use crate::ray::Ray;
+use crate::raytraceable::sphere::Sphere;
 use crate::raytraceable::{RayTraceResult, Raytraceable, RaytraceableUninit};
 
 pub mod camera;
