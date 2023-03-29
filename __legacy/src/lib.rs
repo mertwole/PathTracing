@@ -7,7 +7,7 @@ mod material;
 mod ray;
 mod raytraceable;
 mod renderer;
-mod scene;
+pub mod scene;
 
 use renderer::Renderer;
 use scene::Scene;

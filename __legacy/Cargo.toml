@@ -1,5 +1,5 @@
 [package]
-name = "rust_path_tracing"
+name = "common"
 version = "0.1.0"
 authors = ["mertwole <mertwole@gmail.com>"]
 edition = "2018"

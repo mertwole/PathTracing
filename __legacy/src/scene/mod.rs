@@ -43,8 +43,11 @@ struct SceneDataUninit {
 struct SceneData {
     config: SceneConfig,
     camera: Camera,
+
     kd_tree: Option<KdTree>,
+
     primitives: Vec<Box<dyn Raytraceable>>,
+
     materials: Vec<Box<dyn Material>>,
 }
 

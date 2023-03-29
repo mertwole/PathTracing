@@ -1,49 +1,8 @@
 {
-    "config": {
-        "num_threads": 8,
-        "trace_depth": 8,
-        "workgroup_size": [
-            32,
-            32
-        ]
-    },
     "kd_tree_config": {
         "depth": 16,
         "sah_samples": 6,
         "min_primitives_in_node": 8
-    },
-    "camera": {
-        "resolution": [
-            1024,
-            1024
-        ],
-        "rotation": [
-            [
-                1.0,
-                0.0,
-                0.0
-            ],
-            [
-                0.0,
-                1.0,
-                0.0
-            ],
-            [
-                0.0,
-                0.0,
-                1.0
-            ]
-        ],
-        "position": [
-            0.0,
-            0.0,
-            15.0
-        ],
-        "field_of_view": 0.523,
-        "near_plane": 0.0,
-        "focal_length": 15.0,
-        "bokeh_shape": "circle",
-        "bokeh_size": 0.0
     },
     "materials": [
         {
@@ -232,7 +191,7 @@
     ],
     "meshes": [
         {
-            "path": "./dragon.obj",
+            "path": "./cube.obj",
             "transform": [
                 [
                     1.0,

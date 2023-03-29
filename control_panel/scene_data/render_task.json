@@ -1,0 +1,40 @@
+{
+    "scene": "./scene.json",
+    "config": {
+        "trace_depth": 8,
+        "iterations": 1
+    },
+    "camera": {
+        "resolution": [
+            1024,
+            1024
+        ],
+        "rotation": [
+            [
+                1.0,
+                0.0,
+                0.0
+            ],
+            [
+                0.0,
+                1.0,
+                0.0
+            ],
+            [
+                0.0,
+                0.0,
+                1.0
+            ]
+        ],
+        "position": [
+            0.0,
+            0.0,
+            15.0
+        ],
+        "field_of_view": 0.523,
+        "near_plane": 0.0,
+        "focal_length": 15.0,
+        "bokeh_shape": "circle",
+        "bokeh_size": 0.0
+    }
+}

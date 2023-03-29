@@ -1,0 +1,12 @@
+{
+    "type": "base",
+    "color": {
+        "type": "color",
+        "color": [
+            0.0,
+            0.0,
+            1.0
+        ]
+    },
+    "reflective": 0.7
+}

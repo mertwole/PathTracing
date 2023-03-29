@@ -1,0 +1,53 @@
+{
+    "type": "node_collection",
+    "children": [
+        {
+            "type": "transform",
+            "matrix": [
+                [
+                    1.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    1.0,
+                    0.0,
+                    -3.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ]
+            ],
+            "child": {
+                "type": "kd_tree",
+                "path": "./cube.tree",
+                "child": {
+                    "type": "mesh",
+                    "path": "./cube.obj",
+                    "material": "./materials/mat0.json"
+                }
+            }
+        },
+        {
+            "type": "sphere",
+            "center": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "radius": 1.0,
+            "material": "./materials/mat1.json"
+        }
+    ]
+}

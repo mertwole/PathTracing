@@ -1,0 +1,11 @@
+{
+    "type": "base",
+    "color": {
+        "type": "color",
+        "color": [
+            1.0,
+            0.0,
+            0.0
+        ]
+    }
+}
