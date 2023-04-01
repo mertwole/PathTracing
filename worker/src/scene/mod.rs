@@ -1,15 +1,22 @@
+mod material;
+mod mesh;
 pub mod scene_node;
 
 use std::collections::HashMap;
 use std::iter;
 
-use crate::material::MaterialUninit;
-use crate::scene::scene_node::ResourceType;
-use crate::{file_store::FileStore, material::Material};
+use image::RgbaImage;
 
-use self::scene_node::{
-    ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReference, ResourceReferenceUninit,
-    SceneNode, SceneNodeUnloaded,
+use crate::scene::scene_node::ResourceType;
+use crate::{file_store::FileStore, scene::mesh::MeshUninit};
+
+use self::{
+    material::{Material, MaterialUninit},
+    mesh::Mesh,
+    scene_node::{
+        ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReference,
+        ResourceReferenceUninit, SceneNode, SceneNodeUnloaded,
+    },
 };
 
 pub trait Initializable {
@@ -101,6 +108,8 @@ impl ReferenceReplacer for ReferenceMapping {
 pub struct Scene {
     hierarchy: Box<dyn SceneNode>,
     materials: Vec<Box<dyn Material>>,
+    meshes: Vec<Mesh>,
+    images: Vec<RgbaImage>,
 }
 
 impl Scene {
@@ -108,6 +117,8 @@ impl Scene {
         Scene {
             hierarchy,
             materials: vec![],
+            meshes: vec![],
+            images: vec![],
         }
     }
 
@@ -120,7 +131,6 @@ impl Scene {
         let hierarchy = hierarchy.load(&mut references);
 
         let mut scene = Scene::new(hierarchy);
-
         loop {
             let pending_processing: Vec<_> = references.get_pending_processing();
             if pending_processing.is_empty() {
@@ -128,21 +138,26 @@ impl Scene {
             }
 
             for (resource_type, reference) in pending_processing {
+                let file_data = file_store.fetch_file(&reference).await;
+
                 match resource_type {
                     ResourceType::Mesh => {
-                        todo!()
+                        let mesh = MeshUninit::load_from_obj(&file_data).init();
+                        scene.meshes.push(mesh);
                     }
                     ResourceType::Material => {
-                        let material_data = file_store.fetch_file(&reference).await;
-                        let material_data = String::from_utf8(material_data)
+                        let material_data = String::from_utf8(file_data)
                             .expect("Invalid data fetched from FileStore");
                         let material: Box<dyn MaterialUninit> =
                             serde_json::de::from_str(&material_data).unwrap();
                         let material = material.init(&mut references);
                         scene.materials.push(material);
                     }
-                    ResourceType::Texture => {
-                        todo!()
+                    ResourceType::Image => {
+                        let image = image::load_from_memory(&file_data)
+                            .expect("Incorrect image format fetched from FileStore")
+                            .to_rgba8();
+                        scene.images.push(image);
                     }
                     ResourceType::KdTree => {
                         todo!()

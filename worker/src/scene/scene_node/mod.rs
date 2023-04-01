@@ -9,10 +9,10 @@ pub mod sphere;
 pub mod transform;
 
 #[typetag::serde(tag = "type")]
-pub trait SceneNodeUnloaded: Initializable<Initialized = Box<dyn SceneNode>> {
+pub trait SceneNodeUnloaded: Initializable<Initialized = Box<dyn SceneNode>> + Send + Sync {
     fn collect_references(&self) -> HashSet<ResourceIdUninit>;
 }
-pub trait SceneNode {}
+pub trait SceneNode: Send + Sync {}
 
 pub type ResourceIdUninit = String;
 pub type ResourceId = usize;
@@ -35,11 +35,11 @@ pub enum ResourceType {
     Mesh,
     Material,
     KdTree,
-    Texture,
+    Image,
 }
 
 impl ResourceType {
     pub fn get_all_variants() -> Vec<ResourceType> {
-        vec![Self::Mesh, Self::Material, Self::KdTree, Self::Texture]
+        vec![Self::Mesh, Self::Material, Self::KdTree, Self::Image]
     }
 }

@@ -30,7 +30,7 @@ impl TextureUninit {
             image: reference_replacer
                 .get_replacement(ResourceReferenceUninit {
                     path: self.image,
-                    ty: ResourceType::Texture,
+                    ty: ResourceType::Image,
                 })
                 .path,
             uv_mode: self.uv_mode,

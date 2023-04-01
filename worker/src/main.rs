@@ -1,16 +1,23 @@
+use futures::Future;
+use std::collections::HashMap;
+use std::pin::Pin;
+use std::sync::Arc;
+
 use amqprs::{
     channel::{
         BasicAckArguments, BasicConsumeArguments, BasicQosArguments, Channel, QueueDeclareArguments,
     },
     connection::Connection,
-    consumer::BlockingConsumer,
+    consumer::{AsyncConsumer, BlockingConsumer},
     BasicProperties, Deliver,
 };
 use clap::Parser;
+use worker::renderer::{cpu_renderer::CPURenderer, Renderer};
 use worker::scene::Scene;
 
 use worker::api::render_task::RenderTask;
 use worker::file_store::FileStore;
+use worker::render_store::RenderStore;
 
 #[derive(Parser)]
 pub struct Cli {
@@ -46,7 +53,7 @@ async fn main() {
 
     let consumer = RenderTaskConsumer::new(args.mongodb_url);
     channel
-        .basic_consume_blocking(
+        .basic_consume(
             consumer,
             BasicConsumeArguments::new(&args.rabbitmq_queue, ""),
         )
@@ -58,16 +65,21 @@ async fn main() {
 
 struct RenderTaskConsumer {
     mongodb_url: String,
+    cached_scenes: HashMap<String, Scene>,
 }
 
 impl RenderTaskConsumer {
     pub fn new(mongodb_url: String) -> RenderTaskConsumer {
-        RenderTaskConsumer { mongodb_url }
+        RenderTaskConsumer {
+            mongodb_url,
+            cached_scenes: HashMap::new(),
+        }
     }
 }
 
-impl BlockingConsumer for RenderTaskConsumer {
-    fn consume(
+#[async_trait::async_trait]
+impl AsyncConsumer for RenderTaskConsumer {
+    async fn consume(
         &mut self,
         channel: &Channel,
         deliver: Deliver,
@@ -76,15 +88,23 @@ impl BlockingConsumer for RenderTaskConsumer {
     ) {
         let render_task_data = String::from_utf8(content).unwrap();
         let render_task: RenderTask = serde_json::de::from_str(&render_task_data).unwrap();
-        println!("Processing: {}", render_task.id);
 
-        let file_store = futures::executor::block_on(FileStore::connect(
-            &self.mongodb_url,
-            &render_task.scene_md5,
-        ));
-        let _scene = futures::executor::block_on(Scene::load(&file_store, &render_task.scene));
+        if !self.cached_scenes.contains_key(&render_task.scene_md5) {
+            println!("Loading scene files...");
+            let file_store = FileStore::connect(&self.mongodb_url, &render_task.scene_md5).await;
+            let scene = Scene::load(&file_store, &render_task.scene).await;
+            self.cached_scenes
+                .insert(render_task.scene_md5.clone(), scene);
+        } else {
+            println!("Scene files found locally");
+        }
+
+        let scene = &self.cached_scenes[&render_task.scene_md5];
+        let renderer = CPURenderer::init(scene);
+        let render_store = RenderStore::new();
+        renderer.render(&render_task, &render_store).await;
 
         let args = BasicAckArguments::new(deliver.delivery_tag(), false);
-        channel.basic_ack_blocking(args).unwrap();
+        channel.basic_ack(args).await.unwrap();
     }
 }
