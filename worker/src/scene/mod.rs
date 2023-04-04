@@ -1,4 +1,4 @@
-mod material;
+pub mod material;
 mod mesh;
 pub mod scene_node;
 
@@ -106,8 +106,8 @@ impl ReferenceReplacer for ReferenceMapping {
 }
 
 pub struct Scene {
-    hierarchy: Box<dyn SceneNode>,
-    materials: Vec<Box<dyn Material>>,
+    pub hierarchy: Box<dyn SceneNode>,
+    pub materials: Vec<Box<dyn Material>>,
     meshes: Vec<Mesh>,
     images: Vec<RgbaImage>,
 }

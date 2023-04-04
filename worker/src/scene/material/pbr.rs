@@ -3,10 +3,11 @@ use serde::{Deserialize, Serialize};
 
 use math::Vec3;
 
+use crate::renderer::cpu_renderer::{self, GetColorResult};
 use crate::scene::scene_node::ReferenceReplacer;
 
 use super::RayTraceResult;
-use super::{GetColorResult, Material, MaterialUninit};
+use super::{Material, MaterialUninit};
 
 // @TODO: Parametrize all fields with MaterialInput
 #[derive(Deserialize, Serialize)]
@@ -93,7 +94,9 @@ impl MaterialUninit for PBRMaterial {
     }
 }
 
-impl Material for PBRMaterial {
+impl Material for PBRMaterial {}
+
+impl cpu_renderer::Material for PBRMaterial {
     fn get_color(&self, dir: Vec3, trace_result: &RayTraceResult) -> GetColorResult {
         let input_dir = dir * -1.0;
 

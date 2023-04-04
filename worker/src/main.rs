@@ -65,7 +65,7 @@ async fn main() {
 
 struct RenderTaskConsumer {
     mongodb_url: String,
-    cached_scenes: HashMap<String, Scene>,
+    cached_scenes: HashMap<String, Arc<Scene>>,
 }
 
 impl RenderTaskConsumer {
@@ -94,15 +94,16 @@ impl AsyncConsumer for RenderTaskConsumer {
             let file_store = FileStore::connect(&self.mongodb_url, &render_task.scene_md5).await;
             let scene = Scene::load(&file_store, &render_task.scene).await;
             self.cached_scenes
-                .insert(render_task.scene_md5.clone(), scene);
+                .insert(render_task.scene_md5.clone(), Arc::from(scene));
         } else {
             println!("Scene files found locally");
         }
 
-        let scene = &self.cached_scenes[&render_task.scene_md5];
-        let renderer = CPURenderer::init(scene);
+        let scene = self.cached_scenes[&render_task.scene_md5].clone();
+        let mut renderer = CPURenderer::init(scene);
         let render_store = RenderStore::new();
-        renderer.render(&render_task, &render_store).await;
+        let render_task = Arc::from(render_task);
+        renderer.render(render_task, &render_store).await;
 
         let args = BasicAckArguments::new(deliver.delivery_tag(), false);
         channel.basic_ack(args).await.unwrap();

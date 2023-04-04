@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use super::{Initializable, ReferenceReplacer, ResourceIdUninit, SceneNode, SceneNodeUnloaded};
 
+use crate::ray::Ray;
+use crate::renderer::cpu_renderer;
+use crate::renderer::cpu_renderer::RayTraceResult;
+
 pub type TransformUnloaded = TransformGeneric<Box<dyn SceneNodeUnloaded>>;
 pub type Transform = TransformGeneric<Box<dyn SceneNode>>;
 
@@ -33,3 +37,9 @@ impl Initializable for TransformUnloaded {
 }
 
 impl SceneNode for Transform {}
+
+impl cpu_renderer::SceneNode for Transform {
+    fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
+        todo!()
+    }
+}

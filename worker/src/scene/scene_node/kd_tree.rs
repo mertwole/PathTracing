@@ -7,6 +7,10 @@ use super::{
     SceneNode, SceneNodeUnloaded,
 };
 
+use crate::ray::Ray;
+use crate::renderer::cpu_renderer;
+use crate::renderer::cpu_renderer::RayTraceResult;
+
 pub type KdTreeUnloaded = KdTreeGeneric<String, Box<dyn SceneNodeUnloaded>>;
 pub type KdTree = KdTreeGeneric<usize, Box<dyn SceneNode>>;
 
@@ -42,3 +46,9 @@ impl Initializable for KdTreeUnloaded {
 }
 
 impl SceneNode for KdTree {}
+
+impl cpu_renderer::SceneNode for KdTree {
+    fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
+        todo!()
+    }
+}

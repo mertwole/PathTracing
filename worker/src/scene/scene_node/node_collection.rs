@@ -2,6 +2,10 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
+use crate::ray::Ray;
+use crate::renderer::cpu_renderer;
+use crate::renderer::cpu_renderer::RayTraceResult;
+
 use crate::scene::Initializable;
 
 use super::{ReferenceReplacer, ResourceIdUninit, SceneNode, SceneNodeUnloaded};
@@ -40,3 +44,17 @@ impl Initializable for NodeCollectionUnloaded {
 }
 
 impl SceneNode for NodeCollection {}
+
+impl cpu_renderer::SceneNode for NodeCollection {
+    fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
+        let mut result = RayTraceResult::void();
+        result.t = f32::INFINITY;
+        for child in &self.children {
+            let child_result = child.trace_ray(ray);
+            if child_result.hit && child_result.t < result.t {
+                result = child_result;
+            }
+        }
+        result
+    }
+}

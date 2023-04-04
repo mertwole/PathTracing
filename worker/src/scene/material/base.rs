@@ -6,9 +6,10 @@ use math::Vec3;
 use super::RayTraceResult;
 use super::{
     material_input::{MaterialInput, MaterialInputUninit},
-    GetColorResult, Material, MaterialUninit,
+    Material, MaterialUninit,
 };
 
+use crate::renderer::cpu_renderer::{self, GetColorResult};
 use crate::scene::scene_node::ReferenceReplacer;
 
 pub type BaseMaterial = BaseMaterialGeneric<MaterialInput>;
@@ -71,7 +72,9 @@ impl MaterialUninit for BaseMaterialUninit {
     }
 }
 
-impl Material for BaseMaterial {
+impl Material for BaseMaterial {}
+
+impl cpu_renderer::Material for BaseMaterial {
     fn get_color(&self, dir: Vec3, trace_result: &RayTraceResult) -> GetColorResult {
         let random_num = thread_rng().gen_range(0.0..1.0);
         if random_num < self.reflective {

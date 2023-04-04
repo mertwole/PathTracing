@@ -6,6 +6,10 @@ use super::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::ray::Ray;
+use crate::renderer::cpu_renderer;
+use crate::renderer::cpu_renderer::RayTraceResult;
+
 pub type MeshUnloaded = MeshGeneric<ResourceIdUninit>;
 pub type Mesh = MeshGeneric<ResourceId>;
 
@@ -46,3 +50,9 @@ impl Initializable for MeshUnloaded {
 }
 
 impl SceneNode for Mesh {}
+
+impl cpu_renderer::SceneNode for Mesh {
+    fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
+        todo!()
+    }
+}

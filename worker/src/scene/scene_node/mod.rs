@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use super::Initializable;
+use crate::renderer::cpu_renderer;
 
 pub mod kd_tree;
 pub mod mesh;
@@ -12,7 +13,7 @@ pub mod transform;
 pub trait SceneNodeUnloaded: Initializable<Initialized = Box<dyn SceneNode>> + Send + Sync {
     fn collect_references(&self) -> HashSet<ResourceIdUninit>;
 }
-pub trait SceneNode: Send + Sync {}
+pub trait SceneNode: Send + Sync + cpu_renderer::SceneNode {}
 
 pub type ResourceIdUninit = String;
 pub type ResourceId = usize;
