@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +13,7 @@ use super::{
 use crate::ray::Ray;
 use crate::renderer::cpu_renderer;
 use crate::renderer::cpu_renderer::RayTraceResult;
+use crate::scene::Scene;
 
 pub type SphereUnloaded = SphereGeneric<ResourceIdUninit>;
 pub type Sphere = SphereGeneric<ResourceId>;
@@ -37,7 +39,7 @@ impl SceneNodeUnloaded for SphereUnloaded {
 impl Initializable for SphereUnloaded {
     type Initialized = Box<dyn SceneNode>;
 
-    fn load(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
+    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
         let material_replacement = reference_replacer.get_replacement(ResourceReferenceUninit {
             ty: ResourceType::Material,
             path: self.material,
@@ -46,7 +48,7 @@ impl Initializable for SphereUnloaded {
         Box::from(Sphere {
             center: self.center,
             radius: self.radius,
-            radius_sqr: self.radius_sqr,
+            radius_sqr: self.radius * self.radius,
             material: material_replacement.path,
         })
     }
@@ -55,7 +57,7 @@ impl Initializable for SphereUnloaded {
 impl SceneNode for Sphere {}
 
 impl cpu_renderer::SceneNode for Sphere {
-    fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
+    fn trace_ray(&self, scene: Arc<Scene>, ray: &Ray) -> RayTraceResult {
         let mut result = RayTraceResult::void();
 
         let a = self.center - ray.source;

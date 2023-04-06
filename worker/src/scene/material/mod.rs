@@ -1,17 +1,12 @@
-use std::marker::{Send, Sync};
+use crate::renderer::cpu_renderer::{self, RayTraceResult};
 
-use crate::{
-    renderer::cpu_renderer::{self, RayTraceResult},
-    scene::scene_node::ReferenceReplacer,
-};
+use super::Initializable;
 
 pub mod base;
 pub mod material_input;
 pub mod pbr;
 
 #[typetag::serde(tag = "type")]
-pub trait MaterialUninit {
-    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn Material>;
-}
+pub trait MaterialUninit: Initializable<Initialized = Box<dyn Material>> {}
 
-pub trait Material: Send + Sync + cpu_renderer::Material {}
+pub trait Material: cpu_renderer::Material {}

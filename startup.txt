@@ -1,0 +1,7 @@
+worker:
+
+cargo run --release -- --mongodb-url mongodb://localhost:27017 --rabbitmq-url amqp://rmq:rmq@localhost:5672/ --rabbitmq-queue RENDER_TASKS
+
+control panel:
+
+cargo run --release -- --mongodb-url mongodb://localhost:27017 --rabbitmq-url amqp://rmq:rmq@localhost:5672/ --rabbitmq-queue RENDER_TASKS

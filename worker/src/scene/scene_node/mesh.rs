@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use super::{
     Initializable, ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReferenceUninit,
@@ -9,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::ray::Ray;
 use crate::renderer::cpu_renderer;
 use crate::renderer::cpu_renderer::RayTraceResult;
+use crate::scene::Scene;
 
 pub type MeshUnloaded = MeshGeneric<ResourceIdUninit>;
 pub type Mesh = MeshGeneric<ResourceId>;
@@ -31,7 +33,7 @@ impl SceneNodeUnloaded for MeshUnloaded {
 impl Initializable for MeshUnloaded {
     type Initialized = Box<dyn SceneNode>;
 
-    fn load(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
+    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
         let material_replacement = reference_replacer.get_replacement(ResourceReferenceUninit {
             ty: ResourceType::Material,
             path: self.material,
@@ -52,7 +54,9 @@ impl Initializable for MeshUnloaded {
 impl SceneNode for Mesh {}
 
 impl cpu_renderer::SceneNode for Mesh {
-    fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
-        todo!()
+    fn trace_ray(&self, scene: Arc<Scene>, ray: &Ray) -> RayTraceResult {
+        let mut result = scene.meshes[self.path].trace_ray(scene.clone(), ray);
+        result.material_id = self.material;
+        result
     }
 }

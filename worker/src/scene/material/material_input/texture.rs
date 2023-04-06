@@ -1,9 +1,13 @@
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use math::{Vec2, Vec3};
 
-use crate::scene::scene_node::{
-    ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReferenceUninit, ResourceType,
+use crate::scene::{
+    scene_node::{
+        ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReferenceUninit, ResourceType,
+    },
+    Scene,
 };
 
 pub type TextureUninit = TextureGeneric<ResourceIdUninit>;
@@ -39,25 +43,22 @@ impl TextureUninit {
 }
 
 impl Texture {
-    pub fn sample(&self, uv: Vec2) -> Vec3 {
-        // let mut uv = match self.uv_mode {
-        //     UvMode::Clamp => Vec2::new(uv.x.clamp(0.0, 1.0), uv.y.clamp(0.0, 1.0)),
-        //     UvMode::Repeat => Vec2::new(uv.x - uv.x.floor(), uv.y - uv.y.floor()),
-        // };
+    pub fn sample(&self, scene: Arc<Scene>, uv: Vec2) -> Vec3 {
+        let image = &scene.images[self.image];
 
-        // uv.y = 1.0 - uv.y;
+        let mut uv = match self.uv_mode {
+            UvMode::Clamp => Vec2::new(uv.x.clamp(0.0, 1.0), uv.y.clamp(0.0, 1.0)),
+            UvMode::Repeat => Vec2::new(uv.x - uv.x.floor(), uv.y - uv.y.floor()),
+        };
 
-        // let coords = uv
-        //     * Vec2::new(
-        //         (self.image.width() - 1) as f32,
-        //         (self.image.height() - 1) as f32,
-        //     );
-        // let pixel = self.image.get_pixel(coords.x as u32, coords.y as u32);
-        // Vec3::new(
-        //     pixel.0[0] as f32 / 256.0,
-        //     pixel.0[1] as f32 / 256.0,
-        //     pixel.0[2] as f32 / 256.0,
-        // )
-        unimplemented!()
+        uv.y = 1.0 - uv.y;
+
+        let coords = uv * Vec2::new((image.width() - 1) as f32, (image.height() - 1) as f32);
+        let pixel = image.get_pixel(coords.x as u32, coords.y as u32);
+        Vec3::new(
+            pixel.0[0] as f32 / 256.0,
+            pixel.0[1] as f32 / 256.0,
+            pixel.0[2] as f32 / 256.0,
+        )
     }
 }

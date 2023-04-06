@@ -29,8 +29,6 @@ pub struct Cli {
     pub rabbitmq_queue: String,
 }
 
-// cargo run --release -- --mongodb-url mongodb://localhost:27017 --rabbitmq-url amqp://rmq:rmq@localhost:5672/ --rabbitmq-queue RENDER_TASKS
-
 #[tokio::main]
 async fn main() {
     let args = Cli::parse();
@@ -101,7 +99,7 @@ impl AsyncConsumer for RenderTaskConsumer {
 
         let scene = self.cached_scenes[&render_task.scene_md5].clone();
         let mut renderer = CPURenderer::init(scene);
-        let render_store = RenderStore::new();
+        let render_store = RenderStore::connect(&self.mongodb_url).await;
         let render_task = Arc::from(render_task);
         renderer.render(render_task, &render_store).await;
 

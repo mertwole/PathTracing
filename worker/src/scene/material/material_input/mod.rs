@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use math::{Vec2, Vec3};
@@ -6,7 +8,7 @@ pub mod texture;
 
 use texture::{Texture, TextureUninit};
 
-use crate::scene::scene_node::ReferenceReplacer;
+use crate::scene::{scene_node::ReferenceReplacer, Scene};
 
 pub type MaterialInputUninit = MaterialInputGeneric<TextureUninit>;
 pub type MaterialInput = MaterialInputGeneric<Texture>;
@@ -39,10 +41,10 @@ impl MaterialInputUninit {
 }
 
 impl MaterialInput {
-    pub fn sample(&self, uv: Vec2) -> Vec3 {
+    pub fn sample(&self, scene: Arc<Scene>, uv: Vec2) -> Vec3 {
         match self {
             MaterialInput::Color { color } => *color,
-            MaterialInput::Texture(texture) => texture.sample(uv),
+            MaterialInput::Texture(texture) => texture.sample(scene, uv),
         }
     }
 }

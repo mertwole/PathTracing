@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rand::*;
 use serde::{Deserialize, Serialize};
 
@@ -11,6 +13,7 @@ use super::{
 
 use crate::renderer::cpu_renderer::{self, GetColorResult};
 use crate::scene::scene_node::ReferenceReplacer;
+use crate::scene::{Initializable, Scene};
 
 pub type BaseMaterial = BaseMaterialGeneric<MaterialInput>;
 type BaseMaterialUninit = BaseMaterialGeneric<MaterialInputUninit>;
@@ -58,7 +61,11 @@ impl BaseMaterial {
 }
 
 #[typetag::serde(name = "base")]
-impl MaterialUninit for BaseMaterialUninit {
+impl MaterialUninit for BaseMaterialUninit {}
+
+impl Initializable for BaseMaterialUninit {
+    type Initialized = Box<dyn Material>;
+
     fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn Material> {
         Box::new(BaseMaterial {
             color: self.color.init(reference_replacer),
@@ -75,7 +82,12 @@ impl MaterialUninit for BaseMaterialUninit {
 impl Material for BaseMaterial {}
 
 impl cpu_renderer::Material for BaseMaterial {
-    fn get_color(&self, dir: Vec3, trace_result: &RayTraceResult) -> GetColorResult {
+    fn get_color(
+        &self,
+        dir: Vec3,
+        trace_result: &RayTraceResult,
+        scene: Arc<Scene>,
+    ) -> GetColorResult {
         let random_num = thread_rng().gen_range(0.0..1.0);
         if random_num < self.reflective {
             // reflect
@@ -123,7 +135,7 @@ impl cpu_renderer::Material for BaseMaterial {
                 new_direction = Vec3::default() - new_direction;
             }
 
-            let color = self.color.sample(trace_result.uv);
+            let color = self.color.sample(scene, trace_result.uv);
             GetColorResult::NextRayColorMultiplierAndDirection(color, new_direction)
         }
     }

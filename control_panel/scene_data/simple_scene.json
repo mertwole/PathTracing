@@ -1,0 +1,49 @@
+{
+    "type": "node_collection",
+    "children": [
+        {
+            "type": "sphere",
+            "center": [
+                0.0,
+                3.0,
+                2.0
+            ],
+            "radius": 1.0,
+            "material": "./materials/mat0.json"
+        },
+        {
+            "type": "transform",
+            "matrix": [
+                [
+                    0.707,
+                    0.0,
+                    0.707,
+                    0.0
+                ],
+                [
+                    0.0,
+                    1.0,
+                    0.0,
+                    -3.0
+                ],
+                [
+                    -0.707,
+                    0.0,
+                    0.707,
+                    0.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ]
+            ],
+            "child": {
+                "type": "mesh",
+                "path": "./cube.obj",
+                "material": "./materials/mat3.json"
+            }
+        }
+    ]
+}

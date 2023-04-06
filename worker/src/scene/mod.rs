@@ -22,7 +22,7 @@ use self::{
 pub trait Initializable {
     type Initialized;
 
-    fn load(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Self::Initialized;
+    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Self::Initialized;
 }
 
 #[derive(Default)]
@@ -108,8 +108,8 @@ impl ReferenceReplacer for ReferenceMapping {
 pub struct Scene {
     pub hierarchy: Box<dyn SceneNode>,
     pub materials: Vec<Box<dyn Material>>,
-    meshes: Vec<Mesh>,
-    images: Vec<RgbaImage>,
+    pub meshes: Vec<Mesh>,
+    pub images: Vec<RgbaImage>,
 }
 
 impl Scene {
@@ -128,7 +128,7 @@ impl Scene {
 
         let hierarchy: Box<dyn SceneNodeUnloaded> = serde_json::de::from_str(&scene_data).unwrap();
         let mut references = ReferenceMapping::default();
-        let hierarchy = hierarchy.load(&mut references);
+        let hierarchy = hierarchy.init(&mut references);
 
         let mut scene = Scene::new(hierarchy);
         loop {
@@ -137,6 +137,7 @@ impl Scene {
                 break;
             }
 
+            // TODO: Generalize?
             for (resource_type, reference) in pending_processing {
                 let file_data = file_store.fetch_file(&reference).await;
 

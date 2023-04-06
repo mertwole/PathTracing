@@ -20,6 +20,7 @@ impl Scene {
         let scene_json = &std::fs::read_to_string(&absolute_path).unwrap();
         let scene_data: Box<dyn SceneRoot> = serde_json::de::from_str(&scene_json).unwrap();
 
+        // FIXME: Not collects material references
         let mut file_references = scene_data.collect_references();
         file_references.insert(path.to_string());
 

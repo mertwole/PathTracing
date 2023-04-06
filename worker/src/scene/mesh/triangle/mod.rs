@@ -8,6 +8,12 @@ mod vertex;
 
 use vertex::{Vertex, VertexUninit};
 
+use crate::ray::Ray;
+use crate::renderer::cpu_renderer;
+use crate::renderer::cpu_renderer::RayTraceResult;
+use crate::scene::Scene;
+use std::sync::Arc;
+
 pub type Triangle = TriangleGeneric<Vertex>;
 pub type TriangleUninit = TriangleGeneric<VertexUninit>;
 
@@ -118,5 +124,46 @@ impl Triangle {
         self.vertices[0].normal * coords.0[0]
             + self.vertices[1].normal * coords.0[1]
             + self.vertices[2].normal * coords.0[2]
+    }
+}
+
+// FIXME: Store material_id inside triangle?
+impl cpu_renderer::SceneNode for Triangle {
+    fn trace_ray(&self, scene: Arc<Scene>, ray: &Ray) -> RayTraceResult {
+        let mut result = RayTraceResult::void();
+        // Moller-Trumbore algorithm
+        let edge0 = self.vertices[1].position - self.vertices[0].position;
+        let edge1 = self.vertices[2].position - self.vertices[0].position;
+        let pvec = ray.direction.cross(edge1);
+        let determinant = edge0.dot(pvec);
+        // If determinant < 0 => ray is tracing from the back side of triangle
+        // Ray is parallel to triangle plane
+        if determinant < math::EPSILON && determinant > -math::EPSILON {
+            return result;
+        }
+        let inv_determinant = 1.0 / determinant;
+        let tvec = ray.source - self.vertices[0].position;
+        let u = tvec.dot(pvec) * inv_determinant;
+        if !(0.0..=1.0).contains(&u) {
+            return result;
+        }
+        let qvec = tvec.cross(edge0);
+        let v = ray.direction.dot(qvec) * inv_determinant;
+        if v < 0.0 || u + v > 1.0 {
+            return result;
+        }
+        result.t = edge1.dot(qvec) * inv_determinant;
+        if result.t < ray.min || result.t > ray.max {
+            return result;
+        }
+
+        result.point = ray.source + ray.direction * result.t;
+        result.hit = true;
+
+        let barycentric_coords = self.get_barycentric_coords(result.point);
+        result.uv = self.get_uv(barycentric_coords);
+        result.normal = self.get_normal(barycentric_coords);
+
+        result
     }
 }

@@ -2,7 +2,7 @@
     "type": "base",
     "color": {
         "type": "texture",
-        "path": "./test_texture_0.png",
+        "path": "../test_texture_0.png",
         "uv_mode": "repeat"
     }
 }

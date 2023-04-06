@@ -1,10 +1,10 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::ray::Ray;
 use crate::renderer::cpu_renderer;
 use crate::renderer::cpu_renderer::RayTraceResult;
+use crate::{ray::Ray, scene::Scene};
 
 use crate::scene::Initializable;
 
@@ -32,12 +32,12 @@ impl SceneNodeUnloaded for NodeCollectionUnloaded {
 impl Initializable for NodeCollectionUnloaded {
     type Initialized = Box<dyn SceneNode>;
 
-    fn load(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
+    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
         Box::from(NodeCollection {
             children: self
                 .children
                 .into_iter()
-                .map(|child| child.load(reference_replacer))
+                .map(|child| child.init(reference_replacer))
                 .collect(),
         })
     }
@@ -46,11 +46,11 @@ impl Initializable for NodeCollectionUnloaded {
 impl SceneNode for NodeCollection {}
 
 impl cpu_renderer::SceneNode for NodeCollection {
-    fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
+    fn trace_ray(&self, scene: Arc<Scene>, ray: &Ray) -> RayTraceResult {
         let mut result = RayTraceResult::void();
         result.t = f32::INFINITY;
         for child in &self.children {
-            let child_result = child.trace_ray(ray);
+            let child_result = child.trace_ray(scene.clone(), ray);
             if child_result.hit && child_result.t < result.t {
                 result = child_result;
             }

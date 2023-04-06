@@ -69,7 +69,7 @@ impl RayTraceResult {
 }
 
 pub trait SceneNode: Send + Sync {
-    fn trace_ray(&self, ray: &Ray) -> RayTraceResult;
+    fn trace_ray(&self, scene: Arc<Scene>, ray: &Ray) -> RayTraceResult;
 }
 
 pub enum GetColorResult {
@@ -78,7 +78,12 @@ pub enum GetColorResult {
 }
 
 pub trait Material: Send + Sync {
-    fn get_color(&self, dir: Vec3, trace_result: &RayTraceResult) -> GetColorResult;
+    fn get_color(
+        &self,
+        dir: Vec3,
+        trace_result: &RayTraceResult,
+        scene: Arc<Scene>,
+    ) -> GetColorResult;
 }
 
 impl CPURenderer {
@@ -113,8 +118,8 @@ impl CPURenderer {
         }
     }
 
-    pub fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
-        self.scene.hierarchy.trace_ray(ray)
+    pub fn trace_ray(&self, scene: Arc<Scene>, ray: &Ray) -> RayTraceResult {
+        self.scene.hierarchy.trace_ray(scene, ray)
     }
 
     fn divide_to_workgroups(&self, render_task: &RenderTask) -> (UVec2, Vec<WorkGroup>) {

@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +11,7 @@ use super::{
 use crate::ray::Ray;
 use crate::renderer::cpu_renderer;
 use crate::renderer::cpu_renderer::RayTraceResult;
+use crate::scene::Scene;
 
 pub type KdTreeUnloaded = KdTreeGeneric<String, Box<dyn SceneNodeUnloaded>>;
 pub type KdTree = KdTreeGeneric<usize, Box<dyn SceneNode>>;
@@ -32,7 +34,7 @@ impl SceneNodeUnloaded for KdTreeUnloaded {
 impl Initializable for KdTreeUnloaded {
     type Initialized = Box<dyn SceneNode>;
 
-    fn load(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
+    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
         let path_replacement = reference_replacer.get_replacement(ResourceReferenceUninit {
             ty: ResourceType::KdTree,
             path: self.path,
@@ -40,7 +42,7 @@ impl Initializable for KdTreeUnloaded {
 
         Box::from(KdTree {
             path: path_replacement.path,
-            child: self.child.load(reference_replacer),
+            child: self.child.init(reference_replacer),
         })
     }
 }
@@ -48,7 +50,7 @@ impl Initializable for KdTreeUnloaded {
 impl SceneNode for KdTree {}
 
 impl cpu_renderer::SceneNode for KdTree {
-    fn trace_ray(&self, ray: &Ray) -> RayTraceResult {
+    fn trace_ray(&self, scene: Arc<Scene>, ray: &Ray) -> RayTraceResult {
         todo!()
     }
 }

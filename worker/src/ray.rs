@@ -1,4 +1,4 @@
-use math::Vec3;
+use math::{Mat4, Vec3, Vec4};
 
 pub struct Ray {
     pub source: Vec3,
@@ -15,6 +15,24 @@ impl Ray {
             direction,
             min,
             max,
+        }
+    }
+
+    pub fn apply_transform(&self, transform: &Mat4) -> Ray {
+        let source = Vec4::from_vec3(self.source);
+        let min_point = Vec4::from_vec3(self.min * self.direction + self.source);
+        let max_point = Vec4::from_vec3(self.max * self.direction + self.source);
+
+        let source = transform * source;
+        let min_point = transform * min_point;
+        let max_point = transform * max_point;
+        let direction = &transform.normal_matrix() * self.direction;
+
+        Ray {
+            source,
+            direction,
+            min: (min_point - source).length(),
+            max: (max_point - source).length(),
         }
     }
 }

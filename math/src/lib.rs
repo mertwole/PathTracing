@@ -410,10 +410,13 @@ impl Mat3 {
         )
     }
 
-    pub fn transponsed_inverse(&self) -> Mat3 {
-        let det = self.row0.x * (self.row1.y * self.row2.z - self.row2.y * self.row1.z)
+    pub fn det(&self) -> f32 {
+        self.row0.x * (self.row1.y * self.row2.z - self.row2.y * self.row1.z)
             - self.row0.y * (self.row1.x * self.row2.z - self.row1.z * self.row2.x)
-            + self.row0.z * (self.row1.x * self.row2.y - self.row1.y * self.row2.x);
+            + self.row0.z * (self.row1.x * self.row2.y - self.row1.y * self.row2.x)
+    }
+
+    pub fn transponsed_inverse(&self) -> Mat3 {
         Mat3 {
             row0: Vec3::new(
                 self.row1.y * self.row2.z - self.row2.y * self.row1.z,
@@ -430,7 +433,7 @@ impl Mat3 {
                 self.row1.x * self.row0.z - self.row0.x * self.row1.z,
                 self.row0.x * self.row1.y - self.row1.x * self.row0.y,
             ),
-        } * (1.0 / det)
+        } * (1.0 / self.det())
     }
 }
 
@@ -518,6 +521,13 @@ impl Vec4 {
     }
 }
 
+impl ops::Mul<f32> for Vec4 {
+    type Output = Vec4;
+    fn mul(self, rhs: f32) -> Vec4 {
+        Vec4::new(self.x * rhs, self.y * rhs, self.z * rhs, self.w * rhs)
+    }
+}
+
 #[derive(Serialize, Deserialize, Default)]
 #[serde(expecting = "expecting [<row0>, <row1>, <row2>, <row3>] array")]
 pub struct Mat4 {
@@ -537,6 +547,92 @@ impl Mat4 {
 
         upper_left.transponsed_inverse()
     }
+
+    fn get_minor(&self, row: usize, column: usize) -> f32 {
+        let rows: Vec<_> = (0..4)
+            .filter(|&r| r != row)
+            .map(|row| match row {
+                0 => self.row0,
+                1 => self.row1,
+                2 => self.row2,
+                3 => self.row3,
+                _ => unreachable!(),
+            })
+            .map(|row| match column {
+                0 => Vec3::new(row.y, row.z, row.w),
+                1 => Vec3::new(row.x, row.z, row.w),
+                2 => Vec3::new(row.x, row.y, row.w),
+                3 => Vec3::new(row.x, row.y, row.z),
+                _ => unreachable!(),
+            })
+            .collect();
+
+        Mat3::new(rows[0], rows[1], rows[2]).det()
+    }
+
+    pub fn transponsed_inverse(&self) -> Mat4 {
+        let cofactor_matrix = Mat4 {
+            row0: Vec4 {
+                x: self.get_minor(0, 0),
+                y: -self.get_minor(0, 1),
+                z: self.get_minor(0, 2),
+                w: -self.get_minor(0, 3),
+            },
+            row1: Vec4 {
+                x: -self.get_minor(1, 0),
+                y: self.get_minor(1, 1),
+                z: -self.get_minor(1, 2),
+                w: self.get_minor(1, 3),
+            },
+            row2: Vec4 {
+                x: self.get_minor(2, 0),
+                y: -self.get_minor(2, 1),
+                z: self.get_minor(2, 2),
+                w: -self.get_minor(2, 3),
+            },
+            row3: Vec4 {
+                x: -self.get_minor(3, 0),
+                y: self.get_minor(3, 1),
+                z: -self.get_minor(3, 2),
+                w: self.get_minor(3, 3),
+            },
+        };
+        let det = self.row0.dot(cofactor_matrix.row0);
+        cofactor_matrix * (1.0 / det)
+    }
+
+    pub fn transponse(self) -> Mat4 {
+        Mat4 {
+            row0: Vec4 {
+                x: self.row0.x,
+                y: self.row1.x,
+                z: self.row2.x,
+                w: self.row3.x,
+            },
+            row1: Vec4 {
+                x: self.row0.y,
+                y: self.row1.y,
+                z: self.row2.y,
+                w: self.row3.y,
+            },
+            row2: Vec4 {
+                x: self.row0.z,
+                y: self.row1.z,
+                z: self.row2.z,
+                w: self.row3.z,
+            },
+            row3: Vec4 {
+                x: self.row0.w,
+                y: self.row1.w,
+                z: self.row2.w,
+                w: self.row3.w,
+            },
+        }
+    }
+
+    pub fn inverse(&self) -> Mat4 {
+        self.transponsed_inverse().transponse()
+    }
 }
 
 impl ops::Mul<Vec4> for &Mat4 {
@@ -544,5 +640,17 @@ impl ops::Mul<Vec4> for &Mat4 {
     fn mul(self, rhs: Vec4) -> Vec3 {
         let w = rhs.dot(self.row3);
         Vec3::new(rhs.dot(self.row0), rhs.dot(self.row1), rhs.dot(self.row2)) / w
+    }
+}
+
+impl ops::Mul<f32> for Mat4 {
+    type Output = Mat4;
+    fn mul(self, rhs: f32) -> Mat4 {
+        Mat4 {
+            row0: self.row0 * rhs,
+            row1: self.row1 * rhs,
+            row2: self.row2 * rhs,
+            row3: self.row3 * rhs,
+        }
     }
 }

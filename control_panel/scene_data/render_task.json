@@ -1,5 +1,5 @@
 {
-    "scene": "./scene.json",
+    "scene": "./simple_scene.json",
     "config": {
         "trace_depth": 8,
         "iterations": 1

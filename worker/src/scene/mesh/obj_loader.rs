@@ -1,6 +1,7 @@
 use std::{convert::TryInto, io::BufReader};
 
 use math::{Vec2, Vec3};
+use tobj::{LoadError, MTLLoadResult};
 
 use super::triangle::TriangleUninit;
 
@@ -13,7 +14,7 @@ pub fn load(file_data: &[u8]) -> Vec<TriangleUninit> {
             triangulate: true,
             ..tobj::OFFLINE_RENDERING_LOAD_OPTIONS
         },
-        |_| unreachable!(),
+        |_| MTLLoadResult::Err(LoadError::GenericFailure),
     )
     .unwrap();
 

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use super::image_buffer::ImageBuffer;
 use super::GetColorResult;
 use crate::api::render_task::RenderTask;
+use crate::ray::Ray;
 use crate::scene::Scene;
-use crate::{api::render_task, ray::Ray};
 use math::{HdrColor, UVec2, Vec3};
 
 pub struct WorkGroup {
@@ -30,13 +30,13 @@ impl WorkGroup {
             return Vec3::default();
         }
 
-        let trace_result = scene_data.hierarchy.trace_ray(ray);
+        let trace_result = scene_data.hierarchy.trace_ray(scene_data.clone(), ray);
         if !trace_result.hit {
             return Vec3::default();
         }
 
         let material = scene_data.materials[trace_result.material_id].as_ref();
-        let color_result = material.get_color(ray.direction, &trace_result);
+        let color_result = material.get_color(ray.direction, &trace_result, scene_data.clone());
 
         match color_result {
             GetColorResult::Color(color) => color,
