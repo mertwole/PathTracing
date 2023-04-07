@@ -6,6 +6,26 @@
             "center": [
                 0.0,
                 3.0,
+                4.0
+            ],
+            "radius": 1.0,
+            "material": "./materials/mat0.json"
+        },
+        {
+            "type": "sphere",
+            "center": [
+                -3.0,
+                3.0,
+                2.0
+            ],
+            "radius": 1.0,
+            "material": "./materials/mat0.json"
+        },
+        {
+            "type": "sphere",
+            "center": [
+                3.0,
+                3.0,
                 2.0
             ],
             "radius": 1.0,

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -8,7 +9,9 @@ pub mod texture;
 
 use texture::{Texture, TextureUninit};
 
-use crate::scene::{scene_node::ReferenceReplacer, Scene};
+use crate::scene::{
+    scene_node::ReferenceReplacer, ResourceIdUninit, ResourceReferenceUninit, Scene,
+};
 
 pub type MaterialInputUninit = MaterialInputGeneric<TextureUninit>;
 pub type MaterialInput = MaterialInputGeneric<Texture>;
@@ -36,6 +39,13 @@ impl MaterialInputUninit {
             MaterialInputGeneric::Texture(texture) => {
                 MaterialInput::Texture(texture.init(reference_replacer))
             }
+        }
+    }
+
+    pub fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
+        match self {
+            MaterialInputGeneric::Color { .. } => HashSet::new(),
+            MaterialInputGeneric::Texture(texture) => texture.collect_references(),
         }
     }
 }

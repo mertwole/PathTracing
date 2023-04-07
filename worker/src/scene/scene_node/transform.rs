@@ -4,7 +4,9 @@ use std::sync::Arc;
 use math::{Mat3, Mat4, Vec4};
 use serde::{Deserialize, Serialize};
 
-use super::{Initializable, ReferenceReplacer, ResourceIdUninit, SceneNode, SceneNodeUnloaded};
+use super::{
+    ReferenceReplacer, ResourceIdUninit, ResourceReferenceUninit, SceneNode, SceneNodeUnloaded,
+};
 
 use crate::ray::Ray;
 use crate::renderer::cpu_renderer;
@@ -26,13 +28,9 @@ pub struct TransformGeneric<R> {
 
 #[typetag::serde(name = "transform")]
 impl SceneNodeUnloaded for TransformUnloaded {
-    fn collect_references(&self) -> HashSet<ResourceIdUninit> {
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
         self.child.collect_references()
     }
-}
-
-impl Initializable for TransformUnloaded {
-    type Initialized = Box<dyn SceneNode>;
 
     fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
         Box::from(Transform {

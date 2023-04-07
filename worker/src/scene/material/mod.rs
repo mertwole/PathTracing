@@ -1,12 +1,39 @@
-use crate::renderer::cpu_renderer::{self, RayTraceResult};
+use std::collections::HashSet;
 
-use super::Initializable;
+use super::Resource;
+use crate::renderer::cpu_renderer::{self, RayTraceResult};
+use crate::scene::scene_node::{ReferenceReplacer, ResourceReferenceUninit};
 
 pub mod base;
 pub mod material_input;
 pub mod pbr;
 
 #[typetag::serde(tag = "type")]
-pub trait MaterialUninit: Initializable<Initialized = Box<dyn Material>> {}
+pub trait MaterialUninit {
+    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn Material>;
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit>;
+}
 
 pub trait Material: cpu_renderer::Material {}
+
+pub struct BoxedMaterial(Box<dyn MaterialUninit>);
+
+impl Resource for BoxedMaterial {
+    type Initialized = Box<dyn Material>;
+
+    fn load(data: &[u8]) -> Self
+    where
+        Self: Sized,
+    {
+        let data = String::from_utf8(data.to_vec()).unwrap();
+        BoxedMaterial(serde_json::de::from_str(&data).unwrap())
+    }
+
+    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn Material> {
+        self.0.init(reference_replacer)
+    }
+
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
+        self.0.collect_references()
+    }
+}

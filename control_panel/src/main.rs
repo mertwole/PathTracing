@@ -38,6 +38,7 @@ impl BreakupRenderTask for RenderTask {
                 .enumerate()
                 .map(|(id, mut task)| {
                     task.id = id;
+                    task.config.iterations = 1;
                     task
                 }),
         )

@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use super::{
-    Initializable, ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReferenceUninit,
-    ResourceType, SceneNode, SceneNodeUnloaded,
+    ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReferenceUninit, ResourceType,
+    SceneNode, SceneNodeUnloaded,
 };
 use serde::{Deserialize, Serialize};
 
@@ -23,15 +23,20 @@ pub struct MeshGeneric<R> {
 
 #[typetag::serde(name = "mesh")]
 impl SceneNodeUnloaded for MeshUnloaded {
-    fn collect_references(&self) -> HashSet<ResourceIdUninit> {
-        vec![self.path.clone(), self.material.clone()]
-            .into_iter()
-            .collect()
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
+        vec![
+            ResourceReferenceUninit {
+                path: self.path.clone(),
+                ty: ResourceType::Mesh,
+            },
+            ResourceReferenceUninit {
+                path: self.material.clone(),
+                ty: ResourceType::Material,
+            },
+        ]
+        .into_iter()
+        .collect()
     }
-}
-
-impl Initializable for MeshUnloaded {
-    type Initialized = Box<dyn SceneNode>;
 
     fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
         let material_replacement = reference_replacer.get_replacement(ResourceReferenceUninit {

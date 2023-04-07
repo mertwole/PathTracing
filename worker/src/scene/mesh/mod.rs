@@ -9,10 +9,12 @@ use crate::renderer::cpu_renderer;
 
 use crate::ray::Ray;
 use crate::renderer::cpu_renderer::RayTraceResult;
-use crate::scene::Scene;
+use crate::scene::{scene_node::ReferenceReplacer, ResourceIdUninit, Scene};
+use std::collections::HashSet;
 use std::sync::Arc;
 
-use super::Initializable;
+use super::scene_node::ResourceReferenceUninit;
+use super::Resource;
 
 pub type MeshUninit = MeshGeneric<TriangleUninit>;
 pub type Mesh = MeshGeneric<Triangle>;
@@ -30,6 +32,33 @@ impl MeshUninit {
     }
 
     pub fn init(self) -> Mesh {
+        Mesh {
+            triangles: self
+                .triangles
+                .into_iter()
+                .map(TriangleUninit::init)
+                .collect(),
+        }
+    }
+}
+
+impl Resource for MeshUninit {
+    type Initialized = Mesh;
+
+    fn load(data: &[u8]) -> Self
+    where
+        Self: Sized,
+    {
+        MeshUninit {
+            triangles: obj_loader::load(data),
+        }
+    }
+
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
+        HashSet::new()
+    }
+
+    fn init(self: Box<Self>, _: &mut dyn ReferenceReplacer) -> Self::Initialized {
         Mesh {
             triangles: self
                 .triangles

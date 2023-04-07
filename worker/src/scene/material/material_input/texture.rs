@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use math::{Vec2, Vec3};
@@ -39,6 +40,13 @@ impl TextureUninit {
                 .path,
             uv_mode: self.uv_mode,
         }
+    }
+
+    pub fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
+        HashSet::from([ResourceReferenceUninit {
+            path: self.image.clone(),
+            ty: ResourceType::Image,
+        }])
     }
 }
 

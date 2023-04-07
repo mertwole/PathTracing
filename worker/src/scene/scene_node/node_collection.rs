@@ -6,9 +6,9 @@ use crate::renderer::cpu_renderer;
 use crate::renderer::cpu_renderer::RayTraceResult;
 use crate::{ray::Ray, scene::Scene};
 
-use crate::scene::Initializable;
-
-use super::{ReferenceReplacer, ResourceIdUninit, SceneNode, SceneNodeUnloaded};
+use super::{
+    ReferenceReplacer, ResourceIdUninit, ResourceReferenceUninit, SceneNode, SceneNodeUnloaded,
+};
 
 pub type NodeCollectionUnloaded = NodeCollectionGeneric<Box<dyn SceneNodeUnloaded>>;
 pub type NodeCollection = NodeCollectionGeneric<Box<dyn SceneNode>>;
@@ -20,17 +20,13 @@ pub struct NodeCollectionGeneric<R> {
 
 #[typetag::serde(name = "node_collection")]
 impl SceneNodeUnloaded for NodeCollectionUnloaded {
-    fn collect_references(&self) -> HashSet<ResourceIdUninit> {
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
         let mut refs = HashSet::new();
         for child in &self.children {
             refs.extend(child.collect_references());
         }
         refs
     }
-}
-
-impl Initializable for NodeCollectionUnloaded {
-    type Initialized = Box<dyn SceneNode>;
 
     fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
         Box::from(NodeCollection {

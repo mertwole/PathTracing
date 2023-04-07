@@ -1,8 +1,8 @@
 pub mod material;
-mod mesh;
+pub mod mesh;
 pub mod scene_node;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::iter;
 
 use image::RgbaImage;
@@ -19,10 +19,36 @@ use self::{
     },
 };
 
-pub trait Initializable {
+pub trait Resource {
     type Initialized;
 
+    fn load(data: &[u8]) -> Self
+    where
+        Self: Sized;
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit>;
     fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Self::Initialized;
+}
+
+pub struct SceneHierarchyUninit(Box<dyn SceneNodeUnloaded>);
+
+impl Resource for SceneHierarchyUninit {
+    type Initialized = Box<dyn SceneNode>;
+
+    fn load(data: &[u8]) -> Self
+    where
+        Self: Sized,
+    {
+        let data = String::from_utf8(data.to_vec()).unwrap();
+        SceneHierarchyUninit(serde_json::de::from_str(&data).unwrap())
+    }
+
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
+        self.0.collect_references()
+    }
+
+    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Self::Initialized {
+        self.0.init(reference_replacer)
+    }
 }
 
 #[derive(Default)]

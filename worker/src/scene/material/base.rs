@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use rand::*;
@@ -12,8 +13,8 @@ use super::{
 };
 
 use crate::renderer::cpu_renderer::{self, GetColorResult};
-use crate::scene::scene_node::ReferenceReplacer;
-use crate::scene::{Initializable, Scene};
+use crate::scene::scene_node::{ReferenceReplacer, ResourceReferenceUninit};
+use crate::scene::{Resource, ResourceIdUninit, Scene};
 
 pub type BaseMaterial = BaseMaterialGeneric<MaterialInput>;
 type BaseMaterialUninit = BaseMaterialGeneric<MaterialInputUninit>;
@@ -61,11 +62,7 @@ impl BaseMaterial {
 }
 
 #[typetag::serde(name = "base")]
-impl MaterialUninit for BaseMaterialUninit {}
-
-impl Initializable for BaseMaterialUninit {
-    type Initialized = Box<dyn Material>;
-
+impl MaterialUninit for BaseMaterialUninit {
     fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn Material> {
         Box::new(BaseMaterial {
             color: self.color.init(reference_replacer),
@@ -76,6 +73,10 @@ impl Initializable for BaseMaterialUninit {
             emissive: self.emissive,
             refractive: self.refractive,
         })
+    }
+
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
+        self.color.collect_references()
     }
 }
 

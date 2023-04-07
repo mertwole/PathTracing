@@ -7,7 +7,7 @@ use mongodb::{
     Client,
 };
 
-use worker::api::scene::SceneRoot;
+use worker::api::scene::{Material, Mesh, Resource, ResourceType, SceneHierarchy};
 
 pub struct Scene {
     file_references: HashSet<String>,
@@ -17,16 +17,58 @@ pub struct Scene {
 impl Scene {
     pub fn load(path: &str) -> Scene {
         let absolute_path = format!("./scene_data/{}", path);
-        let scene_json = &std::fs::read_to_string(&absolute_path).unwrap();
-        let scene_data: Box<dyn SceneRoot> = serde_json::de::from_str(&scene_json).unwrap();
+        let scene_data = &std::fs::read(&absolute_path).unwrap();
+        let scene_md5 = format!("{:x}", md5::compute(&scene_data));
+        let scene_data = SceneHierarchy::load(&scene_data);
 
-        // FIXME: Not collects material references
-        let mut file_references = scene_data.collect_references();
-        file_references.insert(path.to_string());
+        let mut staged_to_load = scene_data.collect_references();
+        let mut loaded = HashSet::from([path.to_string()]);
+
+        while !staged_to_load.is_empty() {
+            loaded.extend(
+                staged_to_load
+                    .iter()
+                    .map(|res| res.path.clone())
+                    .collect::<HashSet<_>>(),
+            );
+
+            staged_to_load = staged_to_load
+                .into_iter()
+                .map(|to_load| {
+                    let absolute_path = format!("./scene_data/{}", to_load.path);
+                    println!("Loading... {}", absolute_path);
+                    let data = &std::fs::read(&absolute_path).unwrap();
+                    match to_load.ty {
+                        ResourceType::Image => {
+                            // TODO: Implement abstraction over image and use it here
+                            HashSet::new()
+                        }
+                        ResourceType::Mesh => {
+                            let mesh = Mesh::load(&data);
+                            mesh.collect_references()
+                        }
+                        ResourceType::Material => {
+                            let material = Material::load(&data);
+                            material.collect_references()
+                        }
+                        ResourceType::KdTree => {
+                            unimplemented!()
+                        }
+                    }
+                })
+                .flatten()
+                .collect();
+        }
+
+        println!("Collected references: \n ------------------");
+        for refer in &loaded {
+            println!("{}", refer)
+        }
+        println!("--------------");
 
         Scene {
-            file_references,
-            md5: format!("{:x}", md5::compute(&scene_json)),
+            file_references: loaded,
+            md5: scene_md5,
         }
     }
 

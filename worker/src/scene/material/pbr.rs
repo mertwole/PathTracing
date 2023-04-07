@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use rand::*;
@@ -6,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use math::Vec3;
 
 use crate::renderer::cpu_renderer::{self, GetColorResult};
-use crate::scene::scene_node::ReferenceReplacer;
-use crate::scene::{Initializable, Scene};
+use crate::scene::scene_node::{ReferenceReplacer, ResourceReferenceUninit};
+use crate::scene::{Resource, ResourceIdUninit, Scene};
 
 use super::RayTraceResult;
 use super::{Material, MaterialUninit};
@@ -86,11 +87,7 @@ impl PBRMaterial {
 }
 
 #[typetag::serde(name = "pbr")]
-impl MaterialUninit for PBRMaterial {}
-
-impl Initializable for PBRMaterial {
-    type Initialized = Box<dyn Material>;
-
+impl MaterialUninit for PBRMaterial {
     fn init(
         mut self: Box<Self>,
         reference_replacer: &mut dyn ReferenceReplacer,
@@ -98,6 +95,10 @@ impl Initializable for PBRMaterial {
         self.f0 = self.albedo * self.metallic + Vec3::new_xyz(0.04) * (1.0 - self.metallic);
         self.roughness_sqr = self.roughness.powi(2);
         self
+    }
+
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
+        HashSet::new()
     }
 }
 

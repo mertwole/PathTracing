@@ -4,8 +4,8 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    Initializable, ReferenceReplacer, ResourceIdUninit, ResourceReferenceUninit, ResourceType,
-    SceneNode, SceneNodeUnloaded,
+    ReferenceReplacer, ResourceIdUninit, ResourceReferenceUninit, ResourceType, SceneNode,
+    SceneNodeUnloaded,
 };
 
 use crate::ray::Ray;
@@ -24,15 +24,14 @@ pub struct KdTreeGeneric<R, N> {
 
 #[typetag::serde(name = "kd_tree")]
 impl SceneNodeUnloaded for KdTreeUnloaded {
-    fn collect_references(&self) -> HashSet<ResourceIdUninit> {
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
         let mut refs = self.child.collect_references();
-        refs.insert(self.path.clone());
+        refs.insert(ResourceReferenceUninit {
+            path: self.path.clone(),
+            ty: ResourceType::KdTree,
+        });
         refs
     }
-}
-
-impl Initializable for KdTreeUnloaded {
-    type Initialized = Box<dyn SceneNode>;
 
     fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
         let path_replacement = reference_replacer.get_replacement(ResourceReferenceUninit {

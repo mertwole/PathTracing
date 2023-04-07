@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use math::{Vec2, Vec3};
 
 use super::{
-    Initializable, ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReferenceUninit,
-    ResourceType, SceneNode, SceneNodeUnloaded,
+    ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReferenceUninit, ResourceType,
+    SceneNode, SceneNodeUnloaded,
 };
 
 use crate::ray::Ray;
@@ -31,13 +31,14 @@ pub struct SphereGeneric<R> {
 
 #[typetag::serde(name = "sphere")]
 impl SceneNodeUnloaded for SphereUnloaded {
-    fn collect_references(&self) -> HashSet<ResourceIdUninit> {
-        vec![self.material.clone()].into_iter().collect()
+    fn collect_references(&self) -> HashSet<ResourceReferenceUninit> {
+        vec![ResourceReferenceUninit {
+            path: self.material.clone(),
+            ty: ResourceType::Material,
+        }]
+        .into_iter()
+        .collect()
     }
-}
-
-impl Initializable for SphereUnloaded {
-    type Initialized = Box<dyn SceneNode>;
 
     fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn SceneNode> {
         let material_replacement = reference_replacer.get_replacement(ResourceReferenceUninit {
