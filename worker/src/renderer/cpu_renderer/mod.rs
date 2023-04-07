@@ -1,7 +1,7 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 
-use image::RgbaImage;
+use image::{Rgb32FImage, Rgba32FImage, RgbaImage};
 use threadpool::ThreadPool;
 
 use crate::{api::render_task::RenderTask, ray::Ray, render_store::RenderStore, scene::Scene};
@@ -165,9 +165,9 @@ impl CPURenderer {
         (workgroup_count, workgroups)
     }
 
-    pub fn get_image(&self, render_task: &RenderTask) -> RgbaImage {
-        let mut buffer: Vec<u8> =
-            vec![0u8; render_task.camera.resolution.x * render_task.camera.resolution.y * 4];
+    pub fn get_image(&self, render_task: &RenderTask) -> Rgb32FImage {
+        let mut buffer: Vec<f32> =
+            vec![0.0; render_task.camera.resolution.x * render_task.camera.resolution.y * 3];
 
         for x in 0..self.workgroup_count.x {
             for y in 0..self.workgroup_count.y {
@@ -175,24 +175,21 @@ impl CPURenderer {
                     self.workgroups[x + y * self.workgroup_count.x].get_raw_image_data();
 
                 for buf_x in 0..workgroup_buffer.len() {
+                    let glob_x = x * self.workgroup_size.x + buf_x;
                     for buf_y in 0..workgroup_buffer[0].len() {
                         let buf_pixel = workgroup_buffer[buf_x][buf_y];
-                        let glob_x = x * self.workgroup_size.x + buf_x;
                         let glob_y = y * self.workgroup_size.y + buf_y;
                         let glob_adress = glob_x + glob_y * render_task.camera.resolution.x;
 
-                        let buf_color = Color24bpprgb::from_hdr_tone_mapped(buf_pixel);
-
-                        buffer[glob_adress * 4] = buf_color.r;
-                        buffer[glob_adress * 4 + 1] = buf_color.g;
-                        buffer[glob_adress * 4 + 2] = buf_color.b;
-                        buffer[glob_adress * 4 + 3] = 255;
+                        buffer[glob_adress * 3 + 0] = buf_pixel.r;
+                        buffer[glob_adress * 3 + 1] = buf_pixel.g;
+                        buffer[glob_adress * 3 + 2] = buf_pixel.b;
                     }
                 }
             }
         }
 
-        RgbaImage::from_raw(
+        Rgb32FImage::from_raw(
             render_task.camera.resolution.x as u32,
             render_task.camera.resolution.y as u32,
             buffer,

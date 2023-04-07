@@ -1,12 +1,13 @@
 use amqprs::{
-    channel::{BasicPublishArguments, QueueDeclareArguments},
+    callbacks::ChannelCallback,
+    channel::{BasicPublishArguments, Channel, QueueDeclareArguments},
     connection::Connection,
     BasicProperties, DELIVERY_MODE_PERSISTENT,
 };
 use clap::Parser;
 use mongodb::{options::ClientOptions, Client};
 
-use worker::api::render_task::RenderTask;
+use worker::api::{render_store::RenderStore, render_task::RenderTask};
 
 mod scene;
 use scene::Scene;
@@ -21,8 +22,8 @@ pub struct Cli {
     pub rabbitmq_queue: String,
 }
 
-// Actually there will be MAX_RABBITMQ_MESSAGES not sent messages
-// and [consumer_count] not yet ack'ed in queue
+// Actually there will be MAX_RABBITMQ_MESSAGES not yet sent messages
+// and [consumer_count] not yet ack'ed messages in queue
 const MAX_RABBITMQ_MESSAGES: usize = 4;
 
 trait BreakupRenderTask {
@@ -57,16 +58,32 @@ async fn main() {
 
     // TODO: build kd-trees for each object.
 
-    let client_options = ClientOptions::parse(args.mongodb_url).await.unwrap();
+    let client_options = ClientOptions::parse(&args.mongodb_url).await.unwrap();
     let client = Client::with_options(client_options).unwrap();
     scene.upload_to_file_store(&client).await;
 
-    let rmq_args = (&*args.rabbitmq_url).try_into().unwrap();
+    let _render_count = render_task.config.iterations;
+    let _camera_res = render_task.camera.resolution;
+    let _scene_md5 = render_task.scene_md5.clone();
+
+    send_render_task(render_task, &args.rabbitmq_url, &args.rabbitmq_queue).await;
+
+    let render_store = RenderStore::connect(&args.mongodb_url).await;
+    for id in 0.._render_count {
+        let res = render_store
+            .load_render(id, _camera_res.x as u32, _camera_res.y as u32, &_scene_md5)
+            .await;
+
+        res.save_with_format(format!("./renders/{}.exr", id), image::ImageFormat::OpenExr)
+            .unwrap();
+    }
+}
+
+async fn send_render_task(render_task: RenderTask, rmq_url: &str, rmq_queue: &str) {
+    let rmq_args = (rmq_url).try_into().unwrap();
     let connection = Connection::open(&rmq_args).await.unwrap();
     let channel = connection.open_channel(None).await.unwrap();
-    let queue_args = QueueDeclareArguments::new(&args.rabbitmq_queue)
-        .durable(true)
-        .finish();
+    let queue_args = QueueDeclareArguments::new(rmq_queue).durable(true).finish();
     channel.queue_declare(queue_args.clone()).await.unwrap();
 
     let publish_options = BasicProperties::default()
@@ -90,7 +107,7 @@ async fn main() {
                         .basic_publish(
                             publish_options.clone(),
                             render_task_data.into_bytes(),
-                            BasicPublishArguments::new("", &args.rabbitmq_queue),
+                            BasicPublishArguments::new("", rmq_queue),
                         )
                         .await
                         .unwrap();
@@ -99,6 +116,19 @@ async fn main() {
                     break;
                 }
             }
+        }
+    }
+
+    // Debug: wait for enqueued tasks to be completed.
+    loop {
+        let (_, message_count, _) = channel
+            .queue_declare(queue_args.clone())
+            .await
+            .unwrap()
+            .unwrap();
+
+        if message_count == 0 {
+            break;
         }
     }
 

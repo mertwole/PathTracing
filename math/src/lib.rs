@@ -68,11 +68,23 @@ impl ops::Div<usize> for UVec2 {
 }
 
 #[derive(Clone, Copy, Default)]
-pub struct HdrColor(Vec3);
+pub struct HdrColor {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+}
 
 impl HdrColor {
     pub fn from_vec3(vec3: Vec3) -> HdrColor {
-        HdrColor(vec3)
+        HdrColor {
+            r: vec3.x,
+            g: vec3.y,
+            b: vec3.z,
+        }
+    }
+
+    pub fn to_vec3(&self) -> Vec3 {
+        Vec3::new(self.r, self.g, self.b)
     }
 }
 
@@ -89,7 +101,8 @@ impl Color24bpprgb {
     }
 
     pub fn from_hdr_tone_mapped(hdr: HdrColor) -> Color24bpprgb {
-        let tone_mapped = hdr.0 / (hdr.0 + Vec3::new_xyz(1.0));
+        let hdr = hdr.to_vec3();
+        let tone_mapped = hdr / (hdr + Vec3::new_xyz(1.0));
         Color24bpprgb::from_normalized(tone_mapped.x, tone_mapped.y, tone_mapped.z)
     }
 

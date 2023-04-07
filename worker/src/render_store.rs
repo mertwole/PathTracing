@@ -1,12 +1,14 @@
 use futures::AsyncWriteExt;
-use image::{ImageFormat, RgbaImage};
+use futures_util::io::AsyncReadExt;
+
+use image::{ImageFormat, Rgb32FImage, RgbaImage};
 use itertools::Itertools;
 
 use crate::api::render_task::RenderTask;
 
 use mongodb::{
     options::{ClientOptions, GridFsBucketOptions, GridFsUploadOptions},
-    Client, Database,
+    Client, Database, GridFsBucket,
 };
 
 pub struct RenderStore {
@@ -18,13 +20,12 @@ impl RenderStore {
         let client_options = ClientOptions::parse(mongodb_url).await.unwrap();
         let client = Client::with_options(client_options).unwrap();
 
-        let database = client.database("scene_files");
+        let database = client.database("render_outputs");
 
         RenderStore { database }
     }
 
-    // TODO: Save in correct format (not as raw bytes)
-    pub async fn save_render(&self, render_task: &RenderTask, image: RgbaImage) {
+    pub async fn save_render(&self, render_task: &RenderTask, image: Rgb32FImage) {
         let bucket = self.database.gridfs_bucket(Some(
             GridFsBucketOptions::builder()
                 .bucket_name(render_task.scene_md5.to_string())
@@ -36,30 +37,50 @@ impl RenderStore {
             Some(GridFsUploadOptions::default()),
         );
 
-        let width = image.width();
-        let height = image.height();
-        let image_data = image.to_vec();
-
-        let raw_image = image_data
-            .chunks(4 * width as usize)
+        let raw_image = image
+            .to_vec()
+            .chunks(3 * image.width() as usize)
             .map(|chunk| chunk.to_vec())
             .into_iter()
             .rev()
             .flatten()
+            .map(f32::to_be_bytes)
+            .flatten()
             .collect::<Vec<u8>>();
 
-        image::save_buffer_with_format(
-            format!("./debug_output/{}.bmp", render_task.id),
-            &raw_image,
-            width,
-            height,
-            image::ColorType::Rgba8,
-            image::ImageFormat::Bmp,
-        )
-        .unwrap();
+        upload_stream.write_all(&raw_image).await.unwrap();
+        upload_stream.close().await.unwrap();
 
-        println!("Render saved!");
+        println!("Render {} saved", render_task.id);
+    }
 
-        upload_stream.write_all(&image_data).await.unwrap();
+    pub async fn load_render(
+        &self,
+        id: usize,
+        width: u32,
+        height: u32,
+        scene_md5: &str,
+    ) -> Rgb32FImage {
+        let bucket = self.database.gridfs_bucket(Some(
+            GridFsBucketOptions::builder()
+                .bucket_name(scene_md5.to_string())
+                .build(),
+        ));
+
+        let mut stream = bucket
+            .open_download_stream_by_name(format!("{}", id), None)
+            .await
+            .unwrap();
+
+        let mut render_data = vec![];
+        stream.read_to_end(&mut render_data).await.unwrap();
+
+        let render_data = render_data
+            .chunks(4)
+            .into_iter()
+            .map(|bytes| f32::from_be_bytes(bytes.try_into().unwrap()))
+            .collect();
+
+        Rgb32FImage::from_vec(width, height, render_data).unwrap()
     }
 }

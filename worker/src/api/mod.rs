@@ -10,3 +10,7 @@ pub mod scene {
     pub use crate::scene::scene_node::ResourceReferenceUninit as ResourceReference;
     pub use crate::scene::SceneHierarchyUninit as SceneHierarchy;
 }
+
+pub mod render_store {
+    pub use crate::render_store::RenderStore;
+}

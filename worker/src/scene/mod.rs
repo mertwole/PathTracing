@@ -67,7 +67,7 @@ impl ReferenceCollection {
         self.references[&reference.path]
     }
 
-    fn get_pending_processing(&mut self) -> Vec<ResourceIdUninit> {
+    fn get_pending_processing(&mut self) -> Vec<(ResourceIdUninit, ResourceId)> {
         let last_processed = self.last_processed_id;
         if self.next_id != 0 {
             self.last_processed_id = Some(self.next_id - 1);
@@ -82,8 +82,7 @@ impl ReferenceCollection {
                     true
                 }
             })
-            .map(|(uninit, _)| uninit)
-            .cloned()
+            .map(|(uninit, init)| (uninit.clone(), init.clone()))
             .collect()
     }
 }
@@ -103,14 +102,15 @@ impl Default for ReferenceMapping {
 }
 
 impl ReferenceMapping {
-    pub fn get_pending_processing(&mut self) -> Vec<(ResourceType, ResourceIdUninit)> {
+    pub fn get_pending_processing(&mut self) -> Vec<(ResourceType, ResourceIdUninit, ResourceId)> {
         self.references
             .iter_mut()
             .map(|(ty, ref_collection)| {
                 iter::repeat(ty)
                     .cloned()
                     .zip(ref_collection.get_pending_processing().into_iter())
-                    .collect::<Vec<(_, _)>>()
+                    .map(|(ty, (uninit, init))| (ty, uninit, init))
+                    .collect::<Vec<(_, _, _)>>()
             })
             .flatten()
             .collect()
@@ -156,6 +156,10 @@ impl Scene {
         let mut references = ReferenceMapping::default();
         let hierarchy = hierarchy.init(&mut references);
 
+        let mut loaded_materials: HashMap<usize, Box<dyn Material>> = HashMap::new();
+        let mut loaded_meshes: HashMap<usize, Mesh> = HashMap::new();
+        let mut loaded_images: HashMap<usize, RgbaImage> = HashMap::new();
+
         let mut scene = Scene::new(hierarchy);
         loop {
             let pending_processing: Vec<_> = references.get_pending_processing();
@@ -164,13 +168,13 @@ impl Scene {
             }
 
             // TODO: Generalize?
-            for (resource_type, reference) in pending_processing {
-                let file_data = file_store.fetch_file(&reference).await;
+            for (resource_type, uninit_ref, init_ref) in pending_processing {
+                let file_data = file_store.fetch_file(&uninit_ref).await;
 
                 match resource_type {
                     ResourceType::Mesh => {
                         let mesh = MeshUninit::load_from_obj(&file_data).init();
-                        scene.meshes.push(mesh);
+                        loaded_meshes.insert(init_ref, mesh);
                     }
                     ResourceType::Material => {
                         let material_data = String::from_utf8(file_data)
@@ -178,19 +182,29 @@ impl Scene {
                         let material: Box<dyn MaterialUninit> =
                             serde_json::de::from_str(&material_data).unwrap();
                         let material = material.init(&mut references);
-                        scene.materials.push(material);
+                        loaded_materials.insert(init_ref, material);
                     }
                     ResourceType::Image => {
                         let image = image::load_from_memory(&file_data)
                             .expect("Incorrect image format fetched from FileStore")
                             .to_rgba8();
-                        scene.images.push(image);
+                        loaded_images.insert(init_ref, image);
                     }
                     ResourceType::KdTree => {
                         todo!()
                     }
                 }
             }
+        }
+
+        for id in 0..loaded_materials.len() {
+            scene.materials.push(loaded_materials.remove(&id).unwrap());
+        }
+        for id in 0..loaded_meshes.len() {
+            scene.meshes.push(loaded_meshes.remove(&id).unwrap());
+        }
+        for id in 0..loaded_images.len() {
+            scene.images.push(loaded_images.remove(&id).unwrap());
         }
 
         scene

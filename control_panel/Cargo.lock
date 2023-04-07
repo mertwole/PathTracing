@@ -255,6 +255,7 @@ dependencies = [
  "async-trait",
  "clap",
  "futures-util",
+ "image",
  "math",
  "md5",
  "mongodb",

@@ -36,7 +36,6 @@ impl Scene {
                 .into_iter()
                 .map(|to_load| {
                     let absolute_path = format!("./scene_data/{}", to_load.path);
-                    println!("Loading... {}", absolute_path);
                     let data = &std::fs::read(&absolute_path).unwrap();
                     match to_load.ty {
                         ResourceType::Image => {
@@ -59,12 +58,6 @@ impl Scene {
                 .flatten()
                 .collect();
         }
-
-        println!("Collected references: \n ------------------");
-        for refer in &loaded {
-            println!("{}", refer)
-        }
-        println!("--------------");
 
         Scene {
             file_references: loaded,

@@ -13,6 +13,7 @@ tokio = "1.26.0"
 futures-util = "0.3.27"
 amqprs = { version = "1.2.0", features = ["urispec"] }
 async-trait = "0.1.67"
+image = "0.24.5"
 
 worker = { path = "../worker" }
 math = { path = "../math" }
