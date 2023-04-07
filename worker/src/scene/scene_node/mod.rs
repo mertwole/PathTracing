@@ -5,6 +5,7 @@ use crate::renderer::cpu_renderer;
 pub mod kd_tree;
 pub mod mesh;
 pub mod node_collection;
+pub mod plane;
 pub mod sphere;
 pub mod transform;
 

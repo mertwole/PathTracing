@@ -60,17 +60,20 @@ impl RenderStore {
         width: u32,
         height: u32,
         scene_md5: &str,
-    ) -> Rgb32FImage {
+    ) -> Option<Rgb32FImage> {
         let bucket = self.database.gridfs_bucket(Some(
             GridFsBucketOptions::builder()
                 .bucket_name(scene_md5.to_string())
                 .build(),
         ));
 
-        let mut stream = bucket
+        let mut stream = match bucket
             .open_download_stream_by_name(format!("{}", id), None)
             .await
-            .unwrap();
+        {
+            Ok(stream) => stream,
+            Err(_) => return None,
+        };
 
         let mut render_data = vec![];
         stream.read_to_end(&mut render_data).await.unwrap();
@@ -81,6 +84,6 @@ impl RenderStore {
             .map(|bytes| f32::from_be_bytes(bytes.try_into().unwrap()))
             .collect();
 
-        Rgb32FImage::from_vec(width, height, render_data).unwrap()
+        Some(Rgb32FImage::from_vec(width, height, render_data).unwrap())
     }
 }

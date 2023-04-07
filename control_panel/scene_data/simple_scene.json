@@ -12,26 +12,6 @@
             "material": "./materials/mat0.json"
         },
         {
-            "type": "sphere",
-            "center": [
-                -3.0,
-                3.0,
-                2.0
-            ],
-            "radius": 1.0,
-            "material": "./materials/mat0.json"
-        },
-        {
-            "type": "sphere",
-            "center": [
-                3.0,
-                3.0,
-                2.0
-            ],
-            "radius": 1.0,
-            "material": "./materials/mat0.json"
-        },
-        {
             "type": "transform",
             "matrix": [
                 [
@@ -64,6 +44,126 @@
                 "path": "./cube.obj",
                 "material": "./materials/mat3.json"
             }
+        },
+        {
+            "type": "plane",
+            "point": [
+                0.0,
+                -3.0,
+                0.0
+            ],
+            "normal": [
+                0.0,
+                1.0,
+                0.0
+            ],
+            "tangent": [
+                0.0,
+                0.0,
+                -1.0
+            ],
+            "bitangent": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "material": "./materials/mat2.json"
+        },
+        {
+            "type": "plane",
+            "point": [
+                0.0,
+                3.0,
+                0.0
+            ],
+            "normal": [
+                0.0,
+                -1.0,
+                0.0
+            ],
+            "tangent": [
+                0.0,
+                0.0,
+                -1.0
+            ],
+            "bitangent": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "material": "./materials/mat0.json"
+        },
+        {
+            "type": "plane",
+            "point": [
+                0.0,
+                0.0,
+                -3.0
+            ],
+            "normal": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "tangent": [
+                0.0,
+                1.0,
+                0.0
+            ],
+            "bitangent": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "material": "./materials/mat2.json"
+        },
+        {
+            "type": "plane",
+            "point": [
+                -3.0,
+                0.0,
+                0.0
+            ],
+            "normal": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "tangent": [
+                0.0,
+                1.0,
+                0.0
+            ],
+            "bitangent": [
+                0.0,
+                0.0,
+                -1.0
+            ],
+            "material": "./materials/mat2.json"
+        },
+        {
+            "type": "plane",
+            "point": [
+                3.0,
+                0.0,
+                0.0
+            ],
+            "normal": [
+                -1.0,
+                0.0,
+                0.0
+            ],
+            "tangent": [
+                0.0,
+                1.0,
+                0.0
+            ],
+            "bitangent": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "material": "./materials/mat2.json"
         }
     ]
 }

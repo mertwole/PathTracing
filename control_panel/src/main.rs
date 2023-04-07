@@ -5,6 +5,8 @@ use amqprs::{
     BasicProperties, DELIVERY_MODE_PERSISTENT,
 };
 use clap::Parser;
+use image::{GenericImage, Rgb32FImage, Rgba32FImage};
+use math::UVec2;
 use mongodb::{options::ClientOptions, Client};
 
 use worker::api::{render_store::RenderStore, render_task::RenderTask};
@@ -68,15 +70,54 @@ async fn main() {
 
     send_render_task(render_task, &args.rabbitmq_url, &args.rabbitmq_queue).await;
 
-    let render_store = RenderStore::connect(&args.mongodb_url).await;
-    for id in 0.._render_count {
+    save_renders(&args.mongodb_url, _camera_res, &_scene_md5, _render_count).await;
+}
+
+async fn save_renders(
+    mongodb_url: &str,
+    camera_resolution: UVec2,
+    scene_md5: &str,
+    iterations: usize,
+) {
+    let render_store = RenderStore::connect(mongodb_url).await;
+    let mut renders: Vec<_> = std::iter::repeat(None).take(iterations).collect();
+
+    let mut id = 0;
+    while id < iterations {
         let res = render_store
-            .load_render(id, _camera_res.x as u32, _camera_res.y as u32, &_scene_md5)
+            .load_render(
+                id,
+                camera_resolution.x as u32,
+                camera_resolution.y as u32,
+                &scene_md5,
+            )
             .await;
 
-        res.save_with_format(format!("./renders/{}.exr", id), image::ImageFormat::OpenExr)
-            .unwrap();
+        if res.is_none() {
+            continue;
+        }
+
+        renders[id] = res;
+        id += 1;
     }
+
+    let renders: Vec<_> = renders.into_iter().flatten().collect();
+
+    let mut res = Rgb32FImage::new(camera_resolution.x as u32, camera_resolution.y as u32);
+
+    let multiplier = 1.0 / (iterations as f32);
+    for id in 0..iterations {
+        for x in 0..camera_resolution.x as u32 {
+            for y in 0..camera_resolution.y as u32 {
+                for i in 0..3 {
+                    res.get_pixel_mut(x, y).0[i] += renders[id].get_pixel(x, y).0[i] * multiplier;
+                }
+            }
+        }
+    }
+
+    res.save_with_format(format!("./renders/output.exr"), image::ImageFormat::OpenExr)
+        .unwrap();
 }
 
 async fn send_render_task(render_task: RenderTask, rmq_url: &str, rmq_queue: &str) {
