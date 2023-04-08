@@ -52,8 +52,6 @@ impl TextureUninit {
 
 impl Texture {
     pub fn sample(&self, scene: Arc<Scene>, uv: Vec2) -> Vec3 {
-        let image = &scene.images[self.image];
-
         let mut uv = match self.uv_mode {
             UvMode::Clamp => Vec2::new(uv.x.clamp(0.0, 1.0), uv.y.clamp(0.0, 1.0)),
             UvMode::Repeat => Vec2::new(uv.x - uv.x.floor(), uv.y - uv.y.floor()),
@@ -61,12 +59,8 @@ impl Texture {
 
         uv.y = 1.0 - uv.y;
 
+        let image = &scene.images[self.image];
         let coords = uv * Vec2::new((image.width() - 1) as f32, (image.height() - 1) as f32);
-        let pixel = image.get_pixel(coords.x as u32, coords.y as u32);
-        Vec3::new(
-            pixel.0[0] as f32 / 256.0,
-            pixel.0[1] as f32 / 256.0,
-            pixel.0[2] as f32 / 256.0,
-        )
+        image.get_pixel(coords)
     }
 }

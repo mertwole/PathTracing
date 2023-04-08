@@ -30,7 +30,7 @@ impl Resource for BoxedMaterial {
         BoxedMaterial(serde_json::de::from_str(&data).unwrap())
     }
 
-    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn Material> {
+    fn init(self, reference_replacer: &mut dyn ReferenceReplacer) -> Box<dyn Material> {
         self.0.init(reference_replacer)
     }
 

@@ -3,6 +3,7 @@ use std::{
     iter,
 };
 
+pub mod image;
 pub mod material;
 pub mod mesh;
 
@@ -13,7 +14,7 @@ pub trait Resource {
     where
         Self: Sized;
     fn collect_references(&self) -> HashSet<ResourceReferenceUninit>;
-    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Self::Initialized;
+    fn init(self, reference_replacer: &mut dyn ReferenceReplacer) -> Self::Initialized;
 }
 
 #[derive(Default)]

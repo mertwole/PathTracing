@@ -1,5 +1,4 @@
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use serde::Deserialize;
 
@@ -24,24 +23,6 @@ pub struct MeshGeneric<T> {
     triangles: Vec<T>,
 }
 
-impl MeshUninit {
-    pub fn load_from_obj(file_data: &[u8]) -> MeshUninit {
-        MeshUninit {
-            triangles: obj_loader::load(file_data),
-        }
-    }
-
-    pub fn init(self) -> Mesh {
-        Mesh {
-            triangles: self
-                .triangles
-                .into_iter()
-                .map(TriangleUninit::init)
-                .collect(),
-        }
-    }
-}
-
 impl Resource for MeshUninit {
     type Initialized = Mesh;
 
@@ -58,7 +39,7 @@ impl Resource for MeshUninit {
         HashSet::new()
     }
 
-    fn init(self: Box<Self>, _: &mut dyn ReferenceReplacer) -> Self::Initialized {
+    fn init(self, _: &mut dyn ReferenceReplacer) -> Self::Initialized {
         Mesh {
             triangles: self
                 .triangles

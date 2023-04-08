@@ -159,19 +159,6 @@ async fn send_render_task(render_task: RenderTask, rmq_url: &str, rmq_queue: &st
         }
     }
 
-    // Debug: wait for enqueued tasks to be completed.
-    loop {
-        let (_, message_count, _) = channel
-            .queue_declare(queue_args.clone())
-            .await
-            .unwrap()
-            .unwrap();
-
-        if message_count == 0 {
-            break;
-        }
-    }
-
     channel.close().await.unwrap();
     connection.close().await.unwrap();
 }

@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use image::RgbaImage;
-
 pub mod hierarchy;
 pub mod resource;
 
@@ -11,7 +9,8 @@ use resource::ReferenceMapping;
 use self::{
     hierarchy::{SceneNode, SceneNodeUnloaded},
     resource::{
-        material::{Material, MaterialUninit},
+        image::Image,
+        material::{BoxedMaterial, Material},
         mesh::{Mesh, MeshUninit},
         ReferenceReplacer, Resource, ResourceReferenceUninit, ResourceType,
     },
@@ -32,7 +31,7 @@ impl Resource for SceneHierarchyUninit {
         self.0.collect_references()
     }
 
-    fn init(self: Box<Self>, reference_replacer: &mut dyn ReferenceReplacer) -> Self::Initialized {
+    fn init(self, reference_replacer: &mut dyn ReferenceReplacer) -> Self::Initialized {
         self.0.init(reference_replacer)
     }
 }
@@ -43,7 +42,7 @@ pub struct Scene {
     pub hierarchy: Box<dyn SceneNode>,
     pub materials: Vec<Box<dyn Material>>,
     pub meshes: Vec<Mesh>,
-    pub images: Vec<RgbaImage>,
+    pub images: Vec<Image>,
 }
 
 impl Scene {
@@ -66,7 +65,7 @@ impl Scene {
 
         let mut loaded_materials: HashMap<usize, Box<dyn Material>> = HashMap::new();
         let mut loaded_meshes: HashMap<usize, Mesh> = HashMap::new();
-        let mut loaded_images: HashMap<usize, RgbaImage> = HashMap::new();
+        let mut loaded_images: HashMap<usize, Image> = HashMap::new();
 
         let mut scene = Scene::new(hierarchy);
         loop {
@@ -81,21 +80,15 @@ impl Scene {
 
                 match resource_type {
                     ResourceType::Mesh => {
-                        let mesh = MeshUninit::load_from_obj(&file_data).init();
+                        let mesh = MeshUninit::load(&file_data).init(&mut references);
                         loaded_meshes.insert(init_ref, mesh);
                     }
                     ResourceType::Material => {
-                        let material_data = String::from_utf8(file_data)
-                            .expect("Invalid data fetched from FileStore");
-                        let material: Box<dyn MaterialUninit> =
-                            serde_json::de::from_str(&material_data).unwrap();
-                        let material = material.init(&mut references);
+                        let material = BoxedMaterial::load(&file_data).init(&mut references);
                         loaded_materials.insert(init_ref, material);
                     }
                     ResourceType::Image => {
-                        let image = image::load_from_memory(&file_data)
-                            .expect("Incorrect image format fetched from FileStore")
-                            .to_rgba8();
+                        let image = Image::load(&file_data);
                         loaded_images.insert(init_ref, image);
                     }
                     ResourceType::KdTree => {
