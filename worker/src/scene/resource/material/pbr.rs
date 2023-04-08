@@ -1,14 +1,15 @@
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use rand::*;
 use serde::{Deserialize, Serialize};
 
 use math::Vec3;
 
-use crate::renderer::cpu_renderer::{self, GetColorResult};
-use crate::scene::scene_node::{ReferenceReplacer, ResourceReferenceUninit};
-use crate::scene::{Resource, ResourceIdUninit, Scene};
+use crate::{
+    renderer::cpu_renderer::{self, GetColorResult},
+    scene::resource::{ReferenceReplacer, ResourceReferenceUninit},
+    scene::Scene,
+};
 
 use super::RayTraceResult;
 use super::{Material, MaterialUninit};
@@ -88,10 +89,7 @@ impl PBRMaterial {
 
 #[typetag::serde(name = "pbr")]
 impl MaterialUninit for PBRMaterial {
-    fn init(
-        mut self: Box<Self>,
-        reference_replacer: &mut dyn ReferenceReplacer,
-    ) -> Box<dyn Material> {
+    fn init(mut self: Box<Self>, _: &mut dyn ReferenceReplacer) -> Box<dyn Material> {
         self.f0 = self.albedo * self.metallic + Vec3::new_xyz(0.04) * (1.0 - self.metallic);
         self.roughness_sqr = self.roughness.powi(2);
         self
@@ -105,12 +103,7 @@ impl MaterialUninit for PBRMaterial {
 impl Material for PBRMaterial {}
 
 impl cpu_renderer::Material for PBRMaterial {
-    fn get_color(
-        &self,
-        dir: Vec3,
-        trace_result: &RayTraceResult,
-        scene: Arc<Scene>,
-    ) -> GetColorResult {
+    fn get_color(&self, dir: Vec3, trace_result: &RayTraceResult, _: Arc<Scene>) -> GetColorResult {
         let input_dir = dir * -1.0;
 
         let rand_0 = thread_rng().gen_range(0.0..1.0);

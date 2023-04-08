@@ -2,12 +2,11 @@ use std::{collections::HashSet, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::renderer::cpu_renderer;
-use crate::renderer::cpu_renderer::RayTraceResult;
-use crate::{ray::Ray, scene::Scene};
-
-use super::{
-    ReferenceReplacer, ResourceIdUninit, ResourceReferenceUninit, SceneNode, SceneNodeUnloaded,
+use super::{ReferenceReplacer, ResourceReferenceUninit, SceneNode, SceneNodeUnloaded};
+use crate::{
+    ray::Ray,
+    renderer::cpu_renderer::{self, RayTraceResult},
+    scene::Scene,
 };
 
 pub type NodeCollectionUnloaded = NodeCollectionGeneric<Box<dyn SceneNodeUnloaded>>;

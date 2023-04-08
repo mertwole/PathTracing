@@ -1,7 +1,8 @@
 use std::{convert::TryInto, io::BufReader};
 
-use math::{Vec2, Vec3};
 use tobj::{LoadError, MTLLoadResult};
+
+use math::{Vec2, Vec3};
 
 use super::triangle::TriangleUninit;
 

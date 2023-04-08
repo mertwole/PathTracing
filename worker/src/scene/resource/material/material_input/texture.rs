@@ -1,11 +1,11 @@
+use std::{collections::HashSet, sync::Arc};
+
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::sync::Arc;
 
 use math::{Vec2, Vec3};
 
 use crate::scene::{
-    scene_node::{
+    resource::{
         ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReferenceUninit, ResourceType,
     },
     Scene,

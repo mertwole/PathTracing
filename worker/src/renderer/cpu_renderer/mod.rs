@@ -1,46 +1,16 @@
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::Arc;
+use std::sync::{mpsc::channel, Arc};
 
-use image::{Rgb32FImage, Rgba32FImage, RgbaImage};
+use image::Rgb32FImage;
 use threadpool::ThreadPool;
 
-use crate::{api::render_task::RenderTask, ray::Ray, render_store::RenderStore, scene::Scene};
-use math::{Color24bpprgb, UVec2, Vec2, Vec3};
-
-use super::Renderer;
+use math::{UVec2, Vec2, Vec3};
 
 mod image_buffer;
 mod work_group;
+
+use super::Renderer;
+use crate::{api::render_task::RenderTask, ray::Ray, render_store::RenderStore, scene::Scene};
 use work_group::WorkGroup;
-
-pub struct CPURenderer {
-    scene: Arc<Scene>,
-
-    workgroup_count: UVec2,
-    workgroup_size: UVec2,
-    workgroups: Vec<WorkGroup>,
-    thread_pool: ThreadPool,
-}
-
-#[async_trait::async_trait]
-impl Renderer for CPURenderer {
-    fn init(scene: Arc<Scene>) -> CPURenderer {
-        CPURenderer {
-            scene,
-            workgroup_count: UVec2::default(),
-            workgroup_size: UVec2::new(32, 32),
-            workgroups: vec![],
-            thread_pool: ThreadPool::new(num_cpus::get()),
-        }
-    }
-
-    async fn render(&mut self, render_task: Arc<RenderTask>, render_store: &RenderStore) {
-        (self.workgroup_count, self.workgroups) = self.divide_to_workgroups(&*render_task);
-        self.iterations(render_task.clone());
-        let image = self.get_image(&*render_task);
-        render_store.save_render(&render_task, image).await;
-    }
-}
 
 pub struct RayTraceResult {
     pub hit: bool,
@@ -86,9 +56,18 @@ pub trait Material: Send + Sync {
     ) -> GetColorResult;
 }
 
+pub struct CPURenderer {
+    scene: Arc<Scene>,
+
+    workgroup_count: UVec2,
+    workgroup_size: UVec2,
+    workgroups: Vec<WorkGroup>,
+    thread_pool: ThreadPool,
+}
+
 impl CPURenderer {
     pub fn iterations(&mut self, render_task: Arc<RenderTask>) {
-        let (tx, rx): (Sender<(WorkGroup, usize)>, Receiver<(WorkGroup, usize)>) = channel();
+        let (tx, rx) = channel::<(WorkGroup, usize)>();
 
         for _ in 0..render_task.config.iterations {
             let workgroup_count = self.workgroup_count.x * self.workgroup_count.y;
@@ -116,10 +95,6 @@ impl CPURenderer {
                 self.workgroups.push(workgroup.unwrap());
             }
         }
-    }
-
-    pub fn trace_ray(&self, scene: Arc<Scene>, ray: &Ray) -> RayTraceResult {
-        self.scene.hierarchy.trace_ray(scene, ray)
     }
 
     fn divide_to_workgroups(&self, render_task: &RenderTask) -> (UVec2, Vec<WorkGroup>) {
@@ -181,7 +156,7 @@ impl CPURenderer {
                         let glob_y = y * self.workgroup_size.y + buf_y;
                         let glob_adress = glob_x + glob_y * render_task.camera.resolution.x;
 
-                        buffer[glob_adress * 3 + 0] = buf_pixel.r;
+                        buffer[glob_adress * 3] = buf_pixel.r;
                         buffer[glob_adress * 3 + 1] = buf_pixel.g;
                         buffer[glob_adress * 3 + 2] = buf_pixel.b;
                     }
@@ -195,5 +170,25 @@ impl CPURenderer {
             buffer,
         )
         .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
+impl Renderer for CPURenderer {
+    fn init(scene: Arc<Scene>) -> CPURenderer {
+        CPURenderer {
+            scene,
+            workgroup_count: UVec2::default(),
+            workgroup_size: UVec2::new(32, 32),
+            workgroups: vec![],
+            thread_pool: ThreadPool::new(num_cpus::get()),
+        }
+    }
+
+    async fn render(&mut self, render_task: Arc<RenderTask>, render_store: &RenderStore) {
+        (self.workgroup_count, self.workgroups) = self.divide_to_workgroups(&render_task);
+        self.iterations(render_task.clone());
+        let image = self.get_image(&render_task);
+        render_store.save_render(&render_task, image).await;
     }
 }

@@ -1,18 +1,17 @@
 use amqprs::{
-    callbacks::ChannelCallback,
-    channel::{BasicPublishArguments, Channel, QueueDeclareArguments},
+    channel::{BasicPublishArguments, QueueDeclareArguments},
     connection::Connection,
     BasicProperties, DELIVERY_MODE_PERSISTENT,
 };
 use clap::Parser;
-use image::{GenericImage, Rgb32FImage, Rgba32FImage};
+use image::Rgb32FImage;
 use math::UVec2;
 use mongodb::{options::ClientOptions, Client};
 
-use worker::api::{render_store::RenderStore, render_task::RenderTask};
-
 mod scene;
+
 use scene::Scene;
+use worker::api::{render_store::RenderStore, render_task::RenderTask};
 
 #[derive(Parser)]
 pub struct Cli {
@@ -89,7 +88,7 @@ async fn save_renders(
                 id,
                 camera_resolution.x as u32,
                 camera_resolution.y as u32,
-                &scene_md5,
+                scene_md5,
             )
             .await;
 
@@ -106,17 +105,17 @@ async fn save_renders(
     let mut res = Rgb32FImage::new(camera_resolution.x as u32, camera_resolution.y as u32);
 
     let multiplier = 1.0 / (iterations as f32);
-    for id in 0..iterations {
+    for render in renders {
         for x in 0..camera_resolution.x as u32 {
             for y in 0..camera_resolution.y as u32 {
                 for i in 0..3 {
-                    res.get_pixel_mut(x, y).0[i] += renders[id].get_pixel(x, y).0[i] * multiplier;
+                    res.get_pixel_mut(x, y).0[i] += render.get_pixel(x, y).0[i] * multiplier;
                 }
             }
         }
     }
 
-    res.save_with_format(format!("./renders/output.exr"), image::ImageFormat::OpenExr)
+    res.save_with_format("./renders/output.exr", image::ImageFormat::OpenExr)
         .unwrap();
 }
 

@@ -1,17 +1,13 @@
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use super::{
-    ReferenceReplacer, ResourceIdUninit, ResourceReferenceUninit, ResourceType, SceneNode,
-    SceneNodeUnloaded,
+use super::{ReferenceReplacer, ResourceReferenceUninit, SceneNode, SceneNodeUnloaded};
+use crate::{
+    ray::Ray,
+    renderer::cpu_renderer::{self, RayTraceResult},
+    scene::{resource::ResourceType, Scene},
 };
-
-use crate::ray::Ray;
-use crate::renderer::cpu_renderer;
-use crate::renderer::cpu_renderer::RayTraceResult;
-use crate::scene::Scene;
 
 pub type KdTreeUnloaded = KdTreeGeneric<String, Box<dyn SceneNodeUnloaded>>;
 pub type KdTree = KdTreeGeneric<usize, Box<dyn SceneNode>>;
@@ -49,7 +45,7 @@ impl SceneNodeUnloaded for KdTreeUnloaded {
 impl SceneNode for KdTree {}
 
 impl cpu_renderer::SceneNode for KdTree {
-    fn trace_ray(&self, scene: Arc<Scene>, ray: &Ray) -> RayTraceResult {
+    fn trace_ray(&self, _: Arc<Scene>, _: &Ray) -> RayTraceResult {
         todo!()
     }
 }

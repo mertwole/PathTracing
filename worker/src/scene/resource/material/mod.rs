@@ -1,12 +1,13 @@
 use std::collections::HashSet;
 
-use super::Resource;
-use crate::renderer::cpu_renderer::{self, RayTraceResult};
-use crate::scene::scene_node::{ReferenceReplacer, ResourceReferenceUninit};
-
 pub mod base;
 pub mod material_input;
 pub mod pbr;
+
+use crate::{
+    renderer::cpu_renderer::{self, RayTraceResult},
+    scene::resource::{ReferenceReplacer, Resource, ResourceReferenceUninit},
+};
 
 #[typetag::serde(tag = "type")]
 pub trait MaterialUninit {

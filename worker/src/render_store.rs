@@ -1,15 +1,12 @@
 use futures::AsyncWriteExt;
 use futures_util::io::AsyncReadExt;
-
-use image::{ImageFormat, Rgb32FImage, RgbaImage};
-use itertools::Itertools;
-
-use crate::api::render_task::RenderTask;
-
+use image::Rgb32FImage;
 use mongodb::{
     options::{ClientOptions, GridFsBucketOptions, GridFsUploadOptions},
-    Client, Database, GridFsBucket,
+    Client, Database,
 };
+
+use crate::api::render_task::RenderTask;
 
 pub struct RenderStore {
     database: Database,
@@ -44,8 +41,7 @@ impl RenderStore {
             .into_iter()
             .rev()
             .flatten()
-            .map(f32::to_be_bytes)
-            .flatten()
+            .flat_map(f32::to_be_bytes)
             .collect::<Vec<u8>>();
 
         upload_stream.write_all(&raw_image).await.unwrap();

@@ -1,20 +1,20 @@
+use std::collections::HashSet;
+use std::sync::Arc;
+
 use serde::Deserialize;
 
 mod obj_loader;
 pub mod triangle;
 
+use crate::{
+    ray::Ray,
+    renderer::cpu_renderer::{self, RayTraceResult},
+    scene::{
+        resource::{ReferenceReplacer, Resource, ResourceReferenceUninit},
+        Scene,
+    },
+};
 use triangle::{Triangle, TriangleUninit};
-
-use crate::renderer::cpu_renderer;
-
-use crate::ray::Ray;
-use crate::renderer::cpu_renderer::RayTraceResult;
-use crate::scene::{scene_node::ReferenceReplacer, ResourceIdUninit, Scene};
-use std::collections::HashSet;
-use std::sync::Arc;
-
-use super::scene_node::ResourceReferenceUninit;
-use super::Resource;
 
 pub type MeshUninit = MeshGeneric<TriangleUninit>;
 pub type Mesh = MeshGeneric<Triangle>;

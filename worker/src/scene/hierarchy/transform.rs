@@ -1,17 +1,15 @@
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
-use math::{Mat3, Mat4, Vec4};
 use serde::{Deserialize, Serialize};
 
-use super::{
-    ReferenceReplacer, ResourceIdUninit, ResourceReferenceUninit, SceneNode, SceneNodeUnloaded,
-};
+use math::{Mat3, Mat4, Vec4};
 
-use crate::ray::Ray;
-use crate::renderer::cpu_renderer;
-use crate::renderer::cpu_renderer::RayTraceResult;
-use crate::scene::Scene;
+use super::{ReferenceReplacer, ResourceReferenceUninit, SceneNode, SceneNodeUnloaded};
+use crate::{
+    ray::Ray,
+    renderer::cpu_renderer::{self, RayTraceResult},
+    scene::Scene,
+};
 
 pub type TransformUnloaded = TransformGeneric<Box<dyn SceneNodeUnloaded>>;
 pub type Transform = TransformGeneric<Box<dyn SceneNode>>;

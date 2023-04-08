@@ -1,19 +1,18 @@
-use serde::{Deserialize, Serialize};
+use std::{collections::HashSet, sync::Arc};
 
-use std::collections::HashSet;
-use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 
 use math::{Vec2, Vec3};
 
-use super::{
-    ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReferenceUninit, ResourceType,
-    SceneNode, SceneNodeUnloaded,
+use super::{ReferenceReplacer, ResourceReferenceUninit, SceneNode, SceneNodeUnloaded};
+use crate::{
+    ray::Ray,
+    renderer::cpu_renderer::{self, RayTraceResult},
+    scene::{
+        resource::{ResourceId, ResourceIdUninit, ResourceType},
+        Scene,
+    },
 };
-
-use crate::ray::Ray;
-use crate::renderer::cpu_renderer;
-use crate::renderer::cpu_renderer::RayTraceResult;
-use crate::scene::Scene;
 
 pub type PlaneUnloaded = PlaneGeneric<ResourceIdUninit>;
 pub type Plane = PlaneGeneric<ResourceId>;
@@ -71,7 +70,7 @@ impl SceneNodeUnloaded for PlaneUnloaded {
 impl SceneNode for Plane {}
 
 impl cpu_renderer::SceneNode for Plane {
-    fn trace_ray(&self, scene: Arc<Scene>, ray: &Ray) -> RayTraceResult {
+    fn trace_ray(&self, _: Arc<Scene>, ray: &Ray) -> RayTraceResult {
         let mut result = RayTraceResult::void();
 
         //plane equality:

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use crate::{api::render_task::RenderTask, render_store::RenderStore, scene::Scene};
-
 pub mod cpu_renderer;
+
+use crate::{api::render_task::RenderTask, render_store::RenderStore, scene::Scene};
 
 #[async_trait::async_trait]
 pub trait Renderer {

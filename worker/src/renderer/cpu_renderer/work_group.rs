@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use super::image_buffer::ImageBuffer;
-use super::GetColorResult;
-use crate::api::render_task::RenderTask;
-use crate::ray::Ray;
-use crate::scene::Scene;
 use math::{HdrColor, UVec2, Vec3};
+
+use super::{image_buffer::ImageBuffer, GetColorResult};
+use crate::{api::render_task::RenderTask, ray::Ray, scene::Scene};
 
 pub struct WorkGroup {
     iteration: usize,
@@ -25,27 +23,31 @@ impl WorkGroup {
         }
     }
 
-    fn get_color(&mut self, scene_data: Arc<Scene>, ray: &Ray, max_depth: usize) -> Vec3 {
-        if max_depth == 0 {
-            return Vec3::default();
-        }
+    fn get_color(&mut self, scene_data: Arc<Scene>, mut ray: Ray, max_depth: usize) -> Vec3 {
+        let mut multiplier = Vec3::new_xyz(1.0);
 
-        let trace_result = scene_data.hierarchy.trace_ray(scene_data.clone(), ray);
-        if !trace_result.hit {
-            return Vec3::default();
-        }
+        for _ in 0..max_depth {
+            let trace_result = scene_data.hierarchy.trace_ray(scene_data.clone(), &ray);
+            if !trace_result.hit {
+                return Vec3::default();
+            }
 
-        let material = scene_data.materials[trace_result.material_id].as_ref();
-        let color_result = material.get_color(ray.direction, &trace_result, scene_data.clone());
+            let material = scene_data.materials[trace_result.material_id].as_ref();
+            let color_result = material.get_color(ray.direction, &trace_result, scene_data.clone());
 
-        match color_result {
-            GetColorResult::Color(color) => color,
-            GetColorResult::NextRayColorMultiplierAndDirection(mul, dir) => {
-                let ray_start = trace_result.point + dir * math::EPSILON;
-                let new_ray = Ray::new(ray_start, dir, math::EPSILON, std::f32::MAX);
-                mul * self.get_color(scene_data, &new_ray, max_depth - 1)
+            match color_result {
+                GetColorResult::Color(color) => {
+                    return multiplier * color;
+                }
+                GetColorResult::NextRayColorMultiplierAndDirection(mul, dir) => {
+                    let ray_start = trace_result.point + dir * math::EPSILON;
+                    ray = Ray::new(ray_start, dir, math::EPSILON, std::f32::MAX);
+                    multiplier = multiplier * mul;
+                }
             }
         }
+
+        Vec3::default()
     }
 
     pub fn iteration(&mut self, scene_data: Arc<Scene>, render_task: Arc<RenderTask>) {
@@ -54,8 +56,7 @@ impl WorkGroup {
                 let ray = render_task
                     .camera
                     .get_ray(UVec2::new(self.x_offset + x, self.y_offset + y));
-                let color =
-                    self.get_color(scene_data.clone(), &ray, render_task.config.trace_depth);
+                let color = self.get_color(scene_data.clone(), ray, render_task.config.trace_depth);
                 let pixel = self.buffer.get_pixel_mut(x, y);
                 *pixel = *pixel + color;
             }

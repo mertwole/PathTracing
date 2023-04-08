@@ -6,15 +6,17 @@ use serde::{Deserialize, Serialize};
 
 use math::Vec3;
 
-use super::RayTraceResult;
 use super::{
     material_input::{MaterialInput, MaterialInputUninit},
-    Material, MaterialUninit,
+    Material, MaterialUninit, RayTraceResult,
 };
-
-use crate::renderer::cpu_renderer::{self, GetColorResult};
-use crate::scene::scene_node::{ReferenceReplacer, ResourceReferenceUninit};
-use crate::scene::{Resource, ResourceIdUninit, Scene};
+use crate::{
+    renderer::cpu_renderer::{self, GetColorResult},
+    scene::{
+        resource::{ReferenceReplacer, ResourceReferenceUninit},
+        Scene,
+    },
+};
 
 pub type BaseMaterial = BaseMaterialGeneric<MaterialInput>;
 type BaseMaterialUninit = BaseMaterialGeneric<MaterialInputUninit>;

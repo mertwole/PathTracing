@@ -1,8 +1,9 @@
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::ray::Ray;
 use math::{Mat3, UVec2, Vec2, Vec3};
+
+use crate::ray::Ray;
 
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(rename_all = "lowercase")]

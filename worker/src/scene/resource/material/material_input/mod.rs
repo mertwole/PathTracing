@@ -1,5 +1,4 @@
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
@@ -7,11 +6,8 @@ use math::{Vec2, Vec3};
 
 pub mod texture;
 
+use crate::scene::{resource::ReferenceReplacer, ResourceReferenceUninit, Scene};
 use texture::{Texture, TextureUninit};
-
-use crate::scene::{
-    scene_node::ReferenceReplacer, ResourceIdUninit, ResourceReferenceUninit, Scene,
-};
 
 pub type MaterialInputUninit = MaterialInputGeneric<TextureUninit>;
 pub type MaterialInput = MaterialInputGeneric<Texture>;

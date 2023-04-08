@@ -31,17 +31,6 @@ impl ImageBuffer {
             for img_y in 0..self.height {
                 let mut pixel = self.get_pixel(img_x, img_y);
                 pixel = pixel * color_multiplier;
-
-                //let exposure = 0.5;
-                // // Tonemapping
-                // pixel.x = 1.0 - f32::exp(-pixel.x * exposure);
-                // pixel.y = 1.0 - f32::exp(-pixel.y * exposure);
-                // pixel.z = 1.0 - f32::exp(-pixel.z * exposure);
-                // // Gamma correction
-                // pixel.x = pixel.x.powf(1.0 / 2.2);
-                // pixel.y = pixel.y.powf(1.0 / 2.2);
-                // pixel.z = pixel.z.powf(1.0 / 2.2);
-
                 image_column_data.push(HdrColor::from_vec3(pixel));
             }
             image_data.push(image_column_data);

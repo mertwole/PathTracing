@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
@@ -6,13 +6,12 @@ use math::{Mat4, Vec2, Vec3, Vec4};
 
 mod vertex;
 
+use crate::{
+    ray::Ray,
+    renderer::cpu_renderer::{self, RayTraceResult},
+    scene::Scene,
+};
 use vertex::{Vertex, VertexUninit};
-
-use crate::ray::Ray;
-use crate::renderer::cpu_renderer;
-use crate::renderer::cpu_renderer::RayTraceResult;
-use crate::scene::Scene;
-use std::sync::Arc;
 
 pub type Triangle = TriangleGeneric<Vertex>;
 pub type TriangleUninit = TriangleGeneric<VertexUninit>;
@@ -31,11 +30,11 @@ impl TriangleUninit {
         uvs: Option<[Vec2; 3]>,
     ) -> TriangleUninit {
         let normals = normals
-            .map(|normals| normals.into_iter().map(|normal| Some(normal)).collect())
-            .unwrap_or(vec![None; 3]);
+            .map(|normals| normals.into_iter().map(Some).collect())
+            .unwrap_or_else(|| vec![None; 3]);
         let uvs = uvs
-            .map(|uvs| uvs.into_iter().map(|uv| Some(uv)).collect())
-            .unwrap_or(vec![None; 3]);
+            .map(|uvs| uvs.into_iter().map(Some).collect())
+            .unwrap_or_else(|| vec![None; 3]);
 
         let vertices = itertools::izip!(vertices, normals, uvs)
             .map(|(position, normal, uv)| VertexUninit {
@@ -129,7 +128,7 @@ impl Triangle {
 
 // FIXME: Store material_id inside triangle?
 impl cpu_renderer::SceneNode for Triangle {
-    fn trace_ray(&self, scene: Arc<Scene>, ray: &Ray) -> RayTraceResult {
+    fn trace_ray(&self, _: Arc<Scene>, ray: &Ray) -> RayTraceResult {
         let mut result = RayTraceResult::void();
         // Moller-Trumbore algorithm
         let edge0 = self.vertices[1].position - self.vertices[0].position;

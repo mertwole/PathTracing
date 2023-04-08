@@ -1,16 +1,16 @@
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
-use super::{
-    ReferenceReplacer, ResourceId, ResourceIdUninit, ResourceReferenceUninit, ResourceType,
-    SceneNode, SceneNodeUnloaded,
-};
 use serde::{Deserialize, Serialize};
 
-use crate::ray::Ray;
-use crate::renderer::cpu_renderer;
-use crate::renderer::cpu_renderer::RayTraceResult;
-use crate::scene::Scene;
+use super::{ReferenceReplacer, ResourceReferenceUninit, SceneNode, SceneNodeUnloaded};
+use crate::{
+    ray::Ray,
+    renderer::cpu_renderer::{self, RayTraceResult},
+    scene::{
+        resource::{ResourceId, ResourceIdUninit, ResourceType},
+        Scene,
+    },
+};
 
 pub type MeshUnloaded = MeshGeneric<ResourceIdUninit>;
 pub type Mesh = MeshGeneric<ResourceId>;
