@@ -189,6 +189,6 @@ impl Renderer for CPURenderer {
         (self.workgroup_count, self.workgroups) = self.divide_to_workgroups(&render_task);
         self.iterations(render_task.clone());
         let image = self.get_image(&render_task);
-        render_store.save_render(&render_task, image).await;
+        render_store.save_render(render_task.md5(), image).await;
     }
 }

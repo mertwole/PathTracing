@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use futures_util::{io::AsyncWriteExt, StreamExt};
 use mongodb::{
@@ -7,7 +7,7 @@ use mongodb::{
     Client,
 };
 
-use worker::api::scene::{Material, Mesh, Resource, ResourceType, SceneHierarchy};
+use worker::api::scene::{Image, Material, Mesh, Resource, ResourceType, SceneHierarchy};
 
 pub struct Scene {
     file_references: HashSet<String>,
@@ -24,6 +24,8 @@ impl Scene {
         let mut staged_to_load = scene_data.collect_references();
         let mut loaded = HashSet::from([path.to_string()]);
 
+        let mut md5s = vec![(path.to_string(), scene_md5)];
+
         while !staged_to_load.is_empty() {
             loaded.extend(
                 staged_to_load
@@ -37,10 +39,12 @@ impl Scene {
                 .flat_map(|to_load| {
                     let absolute_path = format!("./scene_data/{}", to_load.path);
                     let data = &std::fs::read(absolute_path).unwrap();
+                    let md5 = format!("{:x}", md5::compute(data));
+                    md5s.push((to_load.path.clone(), md5));
                     match to_load.ty {
                         ResourceType::Image => {
-                            // TODO: Implement abstraction over image and use it here
-                            HashSet::new()
+                            let image = Image::load(data);
+                            image.collect_references()
                         }
                         ResourceType::Mesh => {
                             let mesh = Mesh::load(data);
@@ -58,9 +62,17 @@ impl Scene {
                 .collect();
         }
 
+        md5s.sort_by(|x, y| x.0.cmp(&y.0));
+        let resulting_md5 = md5s
+            .into_iter()
+            .map(|(_, md5)| md5)
+            .fold(String::new(), |acc, x| {
+                format!("{:x}", md5::compute(acc + &x))
+            });
+
         Scene {
             file_references: loaded,
-            md5: scene_md5,
+            md5: resulting_md5,
         }
     }
 

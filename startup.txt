@@ -6,3 +6,5 @@ cargo run --release -- --mongodb-url mongodb://localhost:27017 --rabbitmq-url am
 
 // List files in mongodb
 mongofiles list --db=scene_files --prefix={scene_md5}
+
+// HTTP-requests:
