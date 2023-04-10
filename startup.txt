@@ -1,10 +1,27 @@
 // worker startup
-cargo run --release -- --mongodb-url mongodb://localhost:27017 --rabbitmq-url amqp://rmq:rmq@localhost:5672/ --rabbitmq-queue RENDER_TASKS
+cargo run --release -- \
+--mongodb-url mongodb://localhost:27017 \
+--rabbitmq-url amqp://rmq:rmq@localhost:5672/ \
+--rabbitmq-queue RENDER_TASKS
 
 // control panel startup
-cargo run --release -- --mongodb-url mongodb://localhost:27017 --rabbitmq-url amqp://rmq:rmq@localhost:5672/ --rabbitmq-queue RENDER_TASKS
+cargo run --release -- \
+--mongodb-url mongodb://localhost:27017 \
+--rabbitmq-url amqp://rmq:rmq@localhost:5672/ \
+--rabbitmq-queue RENDER_TASKS \
+--app-endpoint localhost:27503
+
+// client startup
+cargo run --release -- --control-panel-url http://localhost:27503
 
 // List files in mongodb
 mongofiles list --db=scene_files --prefix={scene_md5}
 
-// HTTP-requests:
+// HTTP requests
+curl -X POST http://localhost:27503/scene/b2c19c0b00b7473fa4d05c5cbdc1bf22/files \
+-H "Content-Type: application/json" \
+-d '{"name":"./simple_scene.json","data":[93,10,125]}'
+
+curl -X POST http://localhost:27503/render_tasks \
+-H "Content-Type: application/json" \
+-d '{}'

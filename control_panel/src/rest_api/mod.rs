@@ -1,4 +1,4 @@
-use image::Rgb32FImage;
+use image::Rgba32FImage;
 use serde::{Deserialize, Serialize};
 use worker::api::{render_store::RenderStore, render_task::RenderTask};
 
@@ -18,7 +18,10 @@ use crate::server_state::ServerState;
 use actix_web::{web, HttpResponse};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(upload_file).service(get_file_list);
+    cfg.service(upload_file)
+        .service(get_file_list)
+        .service(post_render_task)
+        .service(get_render);
 }
 
 #[derive(Serialize, Deserialize)]
@@ -40,9 +43,9 @@ macro_rules! into_success_response {
 pub(crate) use into_success_response;
 
 #[derive(Serialize, Deserialize)]
-struct PostFileRequest {
-    name: String,
-    data: Vec<u8>,
+pub struct UploadFileRequest {
+    pub name: String,
+    pub data: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -54,16 +57,21 @@ into_success_response!(PostFileResponse);
 async fn upload_file(
     st: web::Data<ServerState>,
     md5: web::Path<String>,
-    body: web::Json<PostFileRequest>,
+    mut body: web::Payload,
 ) -> actix_web::Result<HttpResponse> {
+    let mut bytes = web::BytesMut::new();
+    while let Some(item) = body.next().await {
+        bytes.extend_from_slice(&item?);
+    }
+    let body = String::from_utf8(bytes.into_iter().collect()).unwrap();
+    let body: UploadFileRequest = serde_json::de::from_str(&body).unwrap();
+
     let mongodb_database = st.mongodb.database("scene_files");
     let bucket = mongodb_database.gridfs_bucket(Some(
         GridFsBucketOptions::builder()
             .bucket_name(md5.clone())
             .build(),
     ));
-
-    let body = body.into_inner();
 
     let file_md5 = format!("{:x}", md5::compute(&body.data));
 
@@ -74,7 +82,7 @@ async fn upload_file(
         .collect::<Vec<_>>()
         .await;
 
-    if !found_files.is_empty() {
+    let upload_file = if !found_files.is_empty() {
         assert_eq!(found_files.len(), 1);
 
         let found_file = found_files.pop().unwrap().expect("TODO: propagate");
@@ -95,30 +103,37 @@ async fn upload_file(
 
         if hash != file_md5 {
             bucket.delete(found_file.id).await.expect("TODO: propagate");
-
-            let mut upload_stream = bucket.open_upload_stream(
-                body.name,
-                Some(
-                    GridFsUploadOptions::builder()
-                        .metadata(Some(doc! { "md5": file_md5 }))
-                        .build(),
-                ),
-            );
-
-            upload_stream
-                .write_all(&body.data)
-                .await
-                .expect("TODO: propagate");
-            upload_stream.close().await.expect("TODO: propagate");
+            true
+        } else {
+            false
         }
+    } else {
+        true
+    };
+
+    if upload_file {
+        let mut upload_stream = bucket.open_upload_stream(
+            body.name,
+            Some(
+                GridFsUploadOptions::builder()
+                    .metadata(Some(doc! { "md5": file_md5 }))
+                    .build(),
+            ),
+        );
+
+        upload_stream
+            .write_all(&body.data)
+            .await
+            .expect("TODO: propagate");
+        upload_stream.close().await.expect("TODO: propagate");
     }
 
     PostFileResponse {}.into()
 }
 
 #[derive(Serialize, Deserialize)]
-struct GetFileListResponse {
-    files: HashMap<String, String>, // (path, md5)
+pub struct GetFileListResponse {
+    pub files: HashMap<String, String>, // (path, md5)
 }
 
 into_success_response!(GetFileListResponse);
@@ -192,8 +207,8 @@ impl BreakupRenderTask for RenderTask {
 }
 
 #[derive(Serialize, Deserialize)]
-struct PostRenderTaskRequest {
-    task: RenderTask,
+pub struct PostRenderTaskRequest {
+    pub task: RenderTask,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -254,26 +269,21 @@ async fn post_render_task(
 }
 
 #[derive(Serialize, Deserialize)]
-struct GetRenderResponse {
-    image_data: Vec<f32>,
-    image_width: u32,
-    image_height: u32,
+pub struct GetRenderResponse {
+    pub image_data: Vec<f32>,
+    pub image_width: u32,
+    pub image_height: u32,
 }
 
 into_success_response!(GetRenderResponse);
 
-#[derive(Serialize, Deserialize)]
-struct GetRenderPath {
-    render_task_md5: String,
-}
-
 #[actix_web::get("render_tasks/{render_task_md5}/render")]
 async fn get_render(
     st: web::Data<ServerState>,
-    path: web::Path<GetRenderPath>,
+    render_task_md5: web::Path<String>,
 ) -> actix_web::Result<HttpResponse> {
     let render_store = RenderStore::connect(&st.mongodb_url).await;
-    let render_count = render_store.render_count(&path.render_task_md5).await;
+    let render_count = render_store.render_count(&render_task_md5).await;
 
     if render_count == 0 {
         return GetRenderResponse {
@@ -287,13 +297,10 @@ async fn get_render(
     let mut res = None;
     let multiplier = 1.0 / (render_count as f32);
     for i in 0..render_count {
-        let render = render_store
-            .load_render(i, &path.render_task_md5)
-            .await
-            .unwrap();
+        let render = render_store.load_render(i, &render_task_md5).await.unwrap();
 
         if res.is_none() {
-            res = Some(Rgb32FImage::new(render.width(), render.height()));
+            res = Some(Rgba32FImage::new(render.width(), render.height()));
         }
 
         if let Some(res) = res.as_mut() {
@@ -302,6 +309,7 @@ async fn get_render(
                     for i in 0..3 {
                         res.get_pixel_mut(x, y).0[i] += render.get_pixel(x, y).0[i] * multiplier;
                     }
+                    res.get_pixel_mut(x, y).0[3] = 1.0;
                 }
             }
         }

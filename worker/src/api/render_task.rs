@@ -30,9 +30,13 @@ pub struct RenderTask {
 
 impl RenderTask {
     pub fn md5(&self) -> String {
+        let mut config = self.config.clone();
+        // RenderTasks are equal even if there's different iteration count in them
+        config.iterations = 0;
+
         let ser = self.scene.clone()
             + &self.scene_md5
-            + &serde_json::ser::to_string(&self.config).unwrap()
+            + &serde_json::ser::to_string(&config).unwrap()
             + &serde_json::ser::to_string(&self.camera).unwrap();
         format!("{:x}", md5::compute(ser))
     }

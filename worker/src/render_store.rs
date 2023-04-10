@@ -1,12 +1,7 @@
-use std::io::BufWriter;
-
 use futures_util::{io::AsyncWriteExt, AsyncReadExt, StreamExt};
-use image::{
-    codecs::openexr::{OpenExrDecoder, OpenExrEncoder},
-    Rgb32FImage,
-};
+use image::Rgb32FImage;
 use mongodb::{
-    bson::doc,
+    bson::{doc, spec::ElementType},
     options::ClientOptions,
     options::{GridFsBucketOptions, GridFsUploadOptions},
     Client, Database, GridFsBucket,
@@ -40,8 +35,8 @@ impl RenderStore {
             Some(
                 GridFsUploadOptions::builder()
                     .metadata(Some(doc! {
-                        "width": image.width(),
-                        "height": image.height()
+                        "width": image.width() as i32,
+                        "height": image.height() as i32
                     }))
                     .build(),
             ),
@@ -101,6 +96,7 @@ impl RenderStore {
         let found_file_metadata = found_file
             .metadata
             .expect("Extraneous file in database: Expected metadata");
+
         let width = found_file_metadata
             .get("width")
             .unwrap_or_else(|| {
@@ -109,7 +105,7 @@ impl RenderStore {
                     found_file_metadata
                 )
             })
-            .as_i64()
+            .as_i32()
             .unwrap_or_else(|| {
                 panic!(
                 "Extraneous file in database: Wrong metadata format [{}], expected width as integer",
@@ -124,7 +120,7 @@ impl RenderStore {
                     found_file_metadata
                 )
             })
-            .as_i64()
+            .as_i32()
             .unwrap_or_else(|| {
                 panic!(
                 "Extraneous file in database: Wrong metadata format [{}], expected height as integer",

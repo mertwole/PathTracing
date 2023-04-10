@@ -1,7 +1,7 @@
 {
     "scene": "./simple_scene.json",
     "config": {
-        "trace_depth": 8,
+        "trace_depth": 10,
         "iterations": 4
     },
     "camera": {
