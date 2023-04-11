@@ -2,6 +2,7 @@
 name = "client"
 version = "0.1.0"
 edition = "2021"
+resolver = "2"
 
 [dependencies]
 reqwest = { version = "0.11.16", features = ["json"] }
@@ -10,8 +11,15 @@ serde = { version = "1.0.107", features = ["derive"] }
 serde_json = "1.0.91"
 
 tokio = "1.27.0"
+futures = "0.3.28"
 
 clap = {version = "4.1.11", features = ["derive", "env"] }
+
+imgui = "0.10.0"
+imgui-wgpu = "0.22.0"
+wgpu = "0.15.1"
+winit = "0.27.5"
+imgui-winit-support = "0.10.0"
 
 image = "0.24.5"
 

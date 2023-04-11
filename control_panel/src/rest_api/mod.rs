@@ -190,7 +190,7 @@ async fn get_file_list(
 
 // Actually there will be MAX_RABBITMQ_MESSAGES not yet sent messages
 // and [consumer_count] not yet ack'ed messages in queue
-const MAX_RABBITMQ_MESSAGES: usize = 4;
+const MAX_RABBITMQ_MESSAGES: usize = 32;
 
 trait BreakupRenderTask {
     fn breakup(self) -> Box<dyn Iterator<Item = RenderTask>>;
