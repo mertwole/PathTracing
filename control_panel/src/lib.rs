@@ -4,7 +4,6 @@ use actix_web::{web, App, HttpServer};
 use clap::Parser;
 
 mod rest_api;
-mod scene;
 mod server_state;
 
 use server_state::ServerState;

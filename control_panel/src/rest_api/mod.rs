@@ -277,6 +277,7 @@ pub struct GetRenderResponse {
 
 into_success_response!(GetRenderResponse);
 
+// TODO: Cache collected renders
 #[actix_web::get("render_tasks/{render_task_md5}/render")]
 async fn get_render(
     st: web::Data<ServerState>,

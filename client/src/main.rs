@@ -4,8 +4,7 @@ use image::{Rgba32FImage, RgbaImage};
 use imgui::*;
 use imgui_wgpu::{Renderer, RendererConfig};
 use imgui_winit_support::WinitPlatform;
-use std::time::Instant;
-use wgpu::{util::DeviceExt, TextureViewDescriptor};
+use std::{sync::Arc, sync::Mutex, time::Instant};
 use winit::{
     dpi::LogicalSize,
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -65,7 +64,7 @@ async fn send_render_task(control_panel_url: &str, render_task: RenderTask) {
         .unwrap();
 }
 
-async fn save_render(control_panel_url: &str, render_task_md5: &str) {
+async fn _save_render(control_panel_url: &str, render_task_md5: &str) {
     let res = reqwest::get(format!(
         "{}/render_tasks/{}/render",
         control_panel_url, render_task_md5
@@ -87,11 +86,173 @@ async fn save_render(control_panel_url: &str, render_task_md5: &str) {
         .unwrap();
 }
 
+struct Framebuffer {
+    back: Arc<Mutex<Option<RgbaImage>>>,
+    front: Option<TextureId>,
+}
+
+impl Framebuffer {
+    fn new() -> Framebuffer {
+        Framebuffer {
+            back: Arc::from(Mutex::from(None)),
+            front: None,
+        }
+    }
+
+    async fn load_image_from_server_internal(
+        back: Arc<Mutex<Option<RgbaImage>>>,
+        control_panel_url: String,
+        render_task_md5: String,
+    ) {
+        let res = reqwest::get(format!(
+            "{}/render_tasks/{}/render",
+            control_panel_url, render_task_md5
+        ))
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+        let res: GetRenderResponse = res.json().await.unwrap();
+
+        let mut back = back.lock().unwrap();
+
+        if res.image_data.len() == 0 {
+            back.replace(RgbaImage::new(1, 1));
+        }
+        let image =
+            Rgba32FImage::from_raw(res.image_width, res.image_height, res.image_data).unwrap();
+
+        let mut gamma_corrected_image = RgbaImage::new(res.image_width, res.image_height);
+        for x in 0..res.image_width {
+            for y in 0..res.image_height {
+                let res_pixel = image.get_pixel(x, y);
+                let r = (res_pixel.0[0] / (1.0 + res_pixel.0[0]) * 255.0) as u8;
+                let g = (res_pixel.0[1] / (1.0 + res_pixel.0[1]) * 255.0) as u8;
+                let b = (res_pixel.0[2] / (1.0 + res_pixel.0[2]) * 255.0) as u8;
+                let gc_pixel = gamma_corrected_image.get_pixel_mut(x, y);
+                gc_pixel.0[0] = r;
+                gc_pixel.0[1] = g;
+                gc_pixel.0[2] = b;
+                gc_pixel.0[3] = 255;
+            }
+        }
+
+        back.replace(gamma_corrected_image);
+    }
+
+    async fn load_image_from_server_loop(
+        back: Arc<Mutex<Option<RgbaImage>>>,
+        control_panel_url: String,
+        render_task_md5: String,
+    ) {
+        loop {
+            Self::load_image_from_server_internal(
+                back.clone(),
+                control_panel_url.clone(),
+                render_task_md5.clone(),
+            )
+            .await;
+
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    }
+
+    fn load_image_from_server(&self, control_panel_url: &str, render_task_md5: &str) {
+        let back = self.back.clone();
+        let control_panel_url = control_panel_url.to_string();
+        let render_task_md5 = render_task_md5.to_string();
+
+        tokio::task::spawn(Self::load_image_from_server_loop(
+            back,
+            control_panel_url,
+            render_task_md5,
+        ));
+    }
+
+    fn swap_buffers(
+        &mut self,
+        renderer: &mut Renderer,
+        queue: &wgpu::Queue,
+        device: &wgpu::Device,
+    ) -> Option<TextureId> {
+        self.front = match self.back.try_lock() {
+            Ok(ref mut guard) => {
+                if let Some(back_image) = guard.as_mut() {
+                    if let Some(front) = self.front {
+                        let texture = renderer.textures.get(front).unwrap();
+                        if texture.width() != back_image.width()
+                            || texture.height() != back_image.height()
+                        {
+                            // TODO: delete 'texture'
+                            renderer.textures.remove(front);
+
+                            let texture_config = imgui_wgpu::TextureConfig {
+                                size: wgpu::Extent3d {
+                                    width: back_image.width(),
+                                    height: back_image.height(),
+                                    ..Default::default()
+                                },
+                                label: None,
+                                format: Some(wgpu::TextureFormat::Rgba8Unorm),
+                                ..Default::default()
+                            };
+
+                            let new_texture =
+                                imgui_wgpu::Texture::new(device, renderer, texture_config);
+                            new_texture.write(
+                                queue,
+                                &back_image.as_raw(),
+                                back_image.width(),
+                                back_image.height(),
+                            );
+                            Some(renderer.textures.insert(new_texture))
+                        } else {
+                            texture.write(
+                                queue,
+                                &back_image.as_raw(),
+                                back_image.width(),
+                                back_image.height(),
+                            );
+                            self.front
+                        }
+                    } else {
+                        let texture_config = imgui_wgpu::TextureConfig {
+                            size: wgpu::Extent3d {
+                                width: back_image.width(),
+                                height: back_image.height(),
+                                ..Default::default()
+                            },
+                            label: None,
+                            format: Some(wgpu::TextureFormat::Rgba8Unorm),
+                            ..Default::default()
+                        };
+
+                        let new_texture =
+                            imgui_wgpu::Texture::new(device, renderer, texture_config);
+                        new_texture.write(
+                            queue,
+                            &back_image.as_raw(),
+                            back_image.width(),
+                            back_image.height(),
+                        );
+                        Some(renderer.textures.insert(new_texture))
+                    }
+                } else {
+                    self.front
+                }
+            }
+            Err(_) => self.front,
+        };
+
+        self.front
+    }
+}
+
 struct MainWindow {
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface: wgpu::Surface,
-    event_loop: EventLoop<()>,
+    event_loop: Option<EventLoop<()>>,
     renderer: Renderer,
     window: Window,
     imgui: imgui::Context,
@@ -100,9 +261,7 @@ struct MainWindow {
     control_panel_url: String,
     render_task_md5: String,
 
-    render_texture_id: TextureId,
-    render_width: u32,
-    render_height: u32,
+    framebuffer: Framebuffer,
 }
 
 impl MainWindow {
@@ -191,11 +350,11 @@ impl MainWindow {
 
         let renderer = Renderer::new(&mut imgui, &device, &queue, renderer_config);
 
-        let mut window = MainWindow {
+        MainWindow {
             device,
             queue,
             surface,
-            event_loop,
+            event_loop: Some(event_loop),
             renderer,
             window,
             imgui,
@@ -204,75 +363,7 @@ impl MainWindow {
             control_panel_url: control_panel_url.to_string(),
             render_task_md5: render_task_md5.to_string(),
 
-            render_texture_id: TextureId::new(0),
-            render_width: 0,
-            render_height: 0,
-        };
-
-        (
-            window.render_texture_id,
-            window.render_width,
-            window.render_height,
-        ) = window.load_image_to_wgpu();
-
-        window
-    }
-
-    fn load_image_to_wgpu(&mut self) -> (TextureId, u32, u32) {
-        let image = futures::executor::block_on(fetch_render(
-            &self.control_panel_url,
-            &self.render_task_md5,
-        ));
-        let (width, height) = image.dimensions();
-        let raw_data = image.into_raw();
-        let texture_config = imgui_wgpu::TextureConfig {
-            size: wgpu::Extent3d {
-                width,
-                height,
-                ..Default::default()
-            },
-            label: None,
-            format: Some(wgpu::TextureFormat::Rgba8Unorm),
-            ..Default::default()
-        };
-
-        let texture = imgui_wgpu::Texture::new(&self.device, &self.renderer, texture_config);
-        texture.write(&self.queue, &raw_data, width, height);
-
-        (self.renderer.textures.insert(texture), width, height)
-    }
-
-    fn update_image(
-        control_panel_url: &str,
-        render_task_md5: &str,
-        renderer: &mut Renderer,
-        render_texture_id: &mut TextureId,
-        queue: &wgpu::Queue,
-        device: &wgpu::Device,
-    ) {
-        let image = futures::executor::block_on(fetch_render(control_panel_url, render_task_md5));
-        let (width, height) = image.dimensions();
-        let raw_data = image.into_raw();
-
-        let texture = renderer.textures.get(*render_texture_id).unwrap();
-
-        if texture.width() != width || texture.height() != height {
-            let texture_config = imgui_wgpu::TextureConfig {
-                size: wgpu::Extent3d {
-                    width,
-                    height,
-                    ..Default::default()
-                },
-                label: None,
-                format: Some(wgpu::TextureFormat::Rgba8Unorm),
-                ..Default::default()
-            };
-
-            let new_texture = imgui_wgpu::Texture::new(device, renderer, texture_config);
-            new_texture.write(queue, &raw_data, width, height);
-            *render_texture_id = renderer.textures.insert(new_texture);
-        } else {
-            texture.write(queue, &raw_data, width, height);
+            framebuffer: Framebuffer::new(),
         }
     }
 
@@ -288,7 +379,9 @@ impl MainWindow {
         let mut last_cursor = None;
         let mut from_last_tick = Duration::ZERO;
 
-        self.event_loop.run(move |event, _, control_flow| {
+        let event_loop = self.event_loop.take().unwrap();
+
+        event_loop.run(move |event, _, control_flow| {
             *control_flow = if cfg!(feature = "metal-auto-capture") {
                 ControlFlow::Exit
             } else {
@@ -353,26 +446,26 @@ impl MainWindow {
                         .expect("Failed to prepare frame");
                     let ui = self.imgui.frame();
 
-                    if from_last_tick.as_secs_f32() > 1.0 {
+                    if from_last_tick.as_secs_f32() > 5.0 {
                         from_last_tick = Duration::ZERO;
-                        println!("Image updated");
-                        Self::update_image(
-                            &self.control_panel_url,
-                            &self.render_task_md5,
-                            &mut self.renderer,
-                            &mut self.render_texture_id,
-                            &self.queue,
-                            &self.device,
-                        );
+                        self.framebuffer
+                            .load_image_from_server(&self.control_panel_url, &self.render_task_md5);
                     }
 
+                    let render_texture = self.framebuffer.swap_buffers(
+                        &mut self.renderer,
+                        &self.queue,
+                        &self.device,
+                    );
+
                     {
-                        //let size = [texture_width as f32, texture_height as f32];
                         let window = ui.window("render");
                         window
                             .size([512.0, 512.0], Condition::FirstUseEver)
                             .build(|| {
-                                Image::new(self.render_texture_id, [512.0, 512.0]).build(ui);
+                                if let Some(render_texture) = render_texture {
+                                    Image::new(render_texture, [512.0, 512.0]).build(ui);
+                                }
                             });
                     }
 
@@ -417,38 +510,4 @@ impl MainWindow {
                 .handle_event(self.imgui.io_mut(), &self.window, &event);
         });
     }
-}
-
-async fn fetch_render(control_panel_url: &str, render_task_md5: &str) -> RgbaImage {
-    let res = reqwest::get(format!(
-        "{}/render_tasks/{}/render",
-        control_panel_url, render_task_md5
-    ))
-    .await
-    .unwrap()
-    .error_for_status()
-    .unwrap();
-    let res: GetRenderResponse = res.json().await.unwrap();
-
-    if res.image_data.len() == 0 {
-        return RgbaImage::new(100, 100);
-    }
-    let image = Rgba32FImage::from_raw(res.image_width, res.image_height, res.image_data).unwrap();
-
-    let mut gamma_corrected_image = RgbaImage::new(res.image_width, res.image_height);
-    for x in 0..res.image_width {
-        for y in 0..res.image_height {
-            let res_pixel = image.get_pixel(x, y);
-            let r = (res_pixel.0[0] / (1.0 + res_pixel.0[0]) * 255.0) as u8;
-            let g = (res_pixel.0[1] / (1.0 + res_pixel.0[1]) * 255.0) as u8;
-            let b = (res_pixel.0[2] / (1.0 + res_pixel.0[2]) * 255.0) as u8;
-            let gc_pixel = gamma_corrected_image.get_pixel_mut(x, y);
-            gc_pixel.0[0] = r;
-            gc_pixel.0[1] = g;
-            gc_pixel.0[2] = b;
-            gc_pixel.0[3] = 255;
-        }
-    }
-
-    gamma_corrected_image
 }
