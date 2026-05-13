@@ -1,8 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
+use futures::{AsyncWriteExt, stream::StreamExt};
+use mongodb::{
+    bson::doc,
+    options::{GridFsBucketOptions, GridFsUploadOptions},
+};
 use worker::api::scene::{Image, Material, Mesh, Resource, ResourceType, SceneHierarchy};
-
-use control_panel::api::*;
 
 struct FileReference {
     path: String,
@@ -85,26 +88,77 @@ impl Scene {
         }
     }
 
-    pub async fn upload_to_control_panel(&self, control_panel_url: &str, render_task_md5: &str) {
-        let client = reqwest::Client::new();
+    pub async fn upload_to_mongodb(&self, mongodb_url: &str, render_task_md5: &str) {
+        let mongodb_options = mongodb::options::ClientOptions::parse(mongodb_url)
+            .await
+            .unwrap();
+        let mongodb = mongodb::Client::with_options(mongodb_options).unwrap();
+
+        let database = mongodb.database("scene_files");
+        let bucket = database.gridfs_bucket(Some(
+            GridFsBucketOptions::builder()
+                .bucket_name(self.md5.clone())
+                .build(),
+        ));
 
         // TODO: Upload only files that haven't yet been uploaded
 
         for reference in &self.file_references {
             let file_data = std::fs::read(format!("./scene_data/{}", reference.path)).unwrap();
-            let body = UploadFileRequest {
-                name: reference.path.clone(),
-                data: file_data,
+            let file_md5 = format!("{:x}", md5::compute(&file_data));
+
+            let mut found_files = bucket
+                .find(doc! { "filename": &reference.path }, None)
+                .await
+                .expect("TODO: propagate")
+                .collect::<Vec<_>>()
+                .await;
+
+            let upload_file = if !found_files.is_empty() {
+                assert_eq!(found_files.len(), 1);
+
+                let found_file = found_files.pop().unwrap().expect("TODO: propagate");
+                let found_file_metadata = found_file
+                    .metadata
+                    .expect("Extraneous file in database: Expected metadata");
+                let hash = found_file_metadata
+                    .get("md5")
+                    .unwrap_or_else(|| panic!(
+                        "Extraneous file in database: Wrong metadata format [{}], expected md5",
+                        found_file_metadata
+                    ))
+                    .as_str()
+                    .unwrap_or_else(|| panic!(
+                        "Extraneous file in database: Wrong metadata format [{}], expected md5 as string",
+                        found_file_metadata
+                    ));
+
+                if hash != file_md5 {
+                    bucket.delete(found_file.id).await.expect("TODO: propagate");
+                    true
+                } else {
+                    false
+                }
+            } else {
+                true
             };
 
-            client
-                .post(format!("{}/scene/{}/files", control_panel_url, self.md5))
-                .json(&body)
-                .send()
-                .await
-                .unwrap()
-                .error_for_status()
-                .unwrap();
+            if upload_file {
+                let mut upload_stream = bucket.open_upload_stream(
+                    reference.path.clone(),
+                    Some(
+                        GridFsUploadOptions::builder()
+                            .metadata(Some(doc! { "md5": file_md5 }))
+                            .build(),
+                    ),
+                );
+
+                upload_stream
+                    .write_all(&file_data)
+                    .await
+                    .expect("TODO: propagate");
+                upload_stream.close().await.expect("TODO: propagate");
+            }
         }
     }
 }

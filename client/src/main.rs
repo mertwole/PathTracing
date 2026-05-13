@@ -1,6 +1,6 @@
 use __core::time::Duration;
 use clap::Parser;
-use image::{Rgba32FImage, RgbaImage};
+use image::{Rgb32FImage, RgbaImage};
 use imgui::*;
 use imgui_wgpu::{Renderer, RendererConfig};
 use imgui_winit_support::WinitPlatform;
@@ -12,8 +12,7 @@ use winit::{
     window::Window,
 };
 
-use control_panel::api::{GetRenderResponse, PostRenderTaskRequest};
-use worker::api::render_task::{RenderTask, RenderTaskUninit};
+use worker::api::render_task::RenderTaskUninit;
 
 mod scene;
 
@@ -21,8 +20,8 @@ use scene::Scene;
 
 #[derive(Parser)]
 pub struct Cli {
-    #[clap(long, env = "CONTROL_PANEL_URL")]
-    pub control_panel_url: String,
+    #[clap(long)]
+    mongodb_url: String,
 }
 
 #[tokio::main]
@@ -40,50 +39,35 @@ async fn main() {
     let render_task_md5 = render_task.md5();
 
     scene
-        .upload_to_control_panel(&args.control_panel_url, &render_task_md5)
+        .upload_to_mongodb(&args.mongodb_url, &render_task_md5)
         .await;
 
-    send_render_task(&args.control_panel_url, render_task).await;
+    let mut worker = worker::Worker::new(args.mongodb_url.clone());
+    let image = worker.render(render_task).await;
 
-    let main_window = MainWindow::init(&args.control_panel_url, &render_task_md5).await;
+    let image = gamma_correction(image);
+
+    let main_window = MainWindow::init(image, &render_task_md5).await;
     main_window.enter_render_loop();
 }
 
-async fn send_render_task(control_panel_url: &str, render_task: RenderTask) {
-    let client = reqwest::Client::new();
-
-    let body = PostRenderTaskRequest { task: render_task };
-
-    client
-        .post(format!("{}/render_tasks", control_panel_url))
-        .json(&body)
-        .send()
-        .await
-        .unwrap()
-        .error_for_status()
-        .unwrap();
-}
-
-async fn _save_render(control_panel_url: &str, render_task_md5: &str) {
-    let res = reqwest::get(format!(
-        "{}/render_tasks/{}/render",
-        control_panel_url, render_task_md5
-    ))
-    .await
-    .unwrap()
-    .error_for_status()
-    .unwrap();
-    let res: GetRenderResponse = res.json().await.unwrap();
-
-    if res.image_data.len() == 0 {
-        return;
+fn gamma_correction(image: Rgb32FImage) -> RgbaImage {
+    let mut gamma_corrected_image = RgbaImage::new(image.width(), image.height());
+    for x in 0..image.width() {
+        for y in 0..image.height() {
+            let res_pixel = image.get_pixel(x, y);
+            let r = (res_pixel.0[0] / (1.0 + res_pixel.0[0]) * 255.0) as u8;
+            let g = (res_pixel.0[1] / (1.0 + res_pixel.0[1]) * 255.0) as u8;
+            let b = (res_pixel.0[2] / (1.0 + res_pixel.0[2]) * 255.0) as u8;
+            let gc_pixel = gamma_corrected_image.get_pixel_mut(x, y);
+            gc_pixel.0[0] = r;
+            gc_pixel.0[1] = g;
+            gc_pixel.0[2] = b;
+            gc_pixel.0[3] = 255;
+        }
     }
 
-    let image = Rgba32FImage::from_raw(res.image_width, res.image_height, res.image_data).unwrap();
-
-    image
-        .save_with_format("./renders/0.exr", image::ImageFormat::OpenExr)
-        .unwrap();
+    gamma_corrected_image
 }
 
 struct Framebuffer {
@@ -99,74 +83,9 @@ impl Framebuffer {
         }
     }
 
-    async fn load_image_from_server_internal(
-        back: Arc<Mutex<Option<RgbaImage>>>,
-        control_panel_url: String,
-        render_task_md5: String,
-    ) {
-        let res = reqwest::get(format!(
-            "{}/render_tasks/{}/render",
-            control_panel_url, render_task_md5
-        ))
-        .await
-        .unwrap()
-        .error_for_status()
-        .unwrap();
-        let res: GetRenderResponse = res.json().await.unwrap();
-
-        let mut back = back.lock().unwrap();
-
-        if res.image_data.len() == 0 {
-            back.replace(RgbaImage::new(1, 1));
-        }
-        let image =
-            Rgba32FImage::from_raw(res.image_width, res.image_height, res.image_data).unwrap();
-
-        let mut gamma_corrected_image = RgbaImage::new(res.image_width, res.image_height);
-        for x in 0..res.image_width {
-            for y in 0..res.image_height {
-                let res_pixel = image.get_pixel(x, y);
-                let r = (res_pixel.0[0] / (1.0 + res_pixel.0[0]) * 255.0) as u8;
-                let g = (res_pixel.0[1] / (1.0 + res_pixel.0[1]) * 255.0) as u8;
-                let b = (res_pixel.0[2] / (1.0 + res_pixel.0[2]) * 255.0) as u8;
-                let gc_pixel = gamma_corrected_image.get_pixel_mut(x, y);
-                gc_pixel.0[0] = r;
-                gc_pixel.0[1] = g;
-                gc_pixel.0[2] = b;
-                gc_pixel.0[3] = 255;
-            }
-        }
-
-        back.replace(gamma_corrected_image);
-    }
-
-    async fn load_image_from_server_loop(
-        back: Arc<Mutex<Option<RgbaImage>>>,
-        control_panel_url: String,
-        render_task_md5: String,
-    ) {
-        loop {
-            Self::load_image_from_server_internal(
-                back.clone(),
-                control_panel_url.clone(),
-                render_task_md5.clone(),
-            )
-            .await;
-
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        }
-    }
-
-    fn load_image_from_server(&self, control_panel_url: &str, render_task_md5: &str) {
-        let back = self.back.clone();
-        let control_panel_url = control_panel_url.to_string();
-        let render_task_md5 = render_task_md5.to_string();
-
-        tokio::task::spawn(Self::load_image_from_server_loop(
-            back,
-            control_panel_url,
-            render_task_md5,
-        ));
+    fn set_image(&self, image: RgbaImage) {
+        let mut back = self.back.lock().unwrap();
+        back.replace(image);
     }
 
     fn swap_buffers(
@@ -258,14 +177,14 @@ struct MainWindow {
     imgui: imgui::Context,
     winit_platform: WinitPlatform,
 
-    control_panel_url: String,
+    image: RgbaImage,
     render_task_md5: String,
 
     framebuffer: Framebuffer,
 }
 
 impl MainWindow {
-    pub async fn init(control_panel_url: &str, render_task_md5: &str) -> MainWindow {
+    pub async fn init(image: RgbaImage, render_task_md5: &str) -> MainWindow {
         let event_loop = EventLoop::new();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -360,7 +279,7 @@ impl MainWindow {
             imgui,
             winit_platform: platform,
 
-            control_panel_url: control_panel_url.to_string(),
+            image,
             render_task_md5: render_task_md5.to_string(),
 
             framebuffer: Framebuffer::new(),
@@ -448,8 +367,7 @@ impl MainWindow {
 
                     if from_last_tick.as_secs_f32() > 5.0 {
                         from_last_tick = Duration::ZERO;
-                        self.framebuffer
-                            .load_image_from_server(&self.control_panel_url, &self.render_task_md5);
+                        self.framebuffer.set_image(self.image.clone());
                     }
 
                     let render_texture = self.framebuffer.swap_buffers(
