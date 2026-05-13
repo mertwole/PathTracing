@@ -1,4 +1,4 @@
-use std::sync::{mpsc::channel, Arc};
+use std::sync::{Arc, mpsc::channel};
 
 use image::Rgb32FImage;
 use threadpool::ThreadPool;
@@ -185,10 +185,9 @@ impl Renderer for CPURenderer {
         }
     }
 
-    async fn render(&mut self, render_task: Arc<RenderTask>, render_store: &RenderStore) {
+    async fn render(&mut self, render_task: Arc<RenderTask>) -> Rgb32FImage {
         (self.workgroup_count, self.workgroups) = self.divide_to_workgroups(&render_task);
         self.iterations(render_task.clone());
-        let image = self.get_image(&render_task);
-        render_store.save_render(render_task.md5(), image).await;
+        self.get_image(&render_task)
     }
 }
