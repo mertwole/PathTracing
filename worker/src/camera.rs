@@ -78,7 +78,7 @@ impl Camera {
             point_on_objective,
             direction.normalized(),
             near_plane_dist,
-            std::f32::MAX,
+            f32::MAX,
         )
     }
 }

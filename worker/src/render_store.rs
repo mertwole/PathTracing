@@ -1,10 +1,10 @@
-use futures_util::{io::AsyncWriteExt, AsyncReadExt, StreamExt};
+use futures_util::{AsyncReadExt, StreamExt, io::AsyncWriteExt};
 use image::Rgb32FImage;
 use mongodb::{
-    bson::{doc, spec::ElementType},
+    Client, Database, GridFsBucket,
+    bson::doc,
     options::ClientOptions,
     options::{GridFsBucketOptions, GridFsUploadOptions},
-    Client, Database, GridFsBucket,
 };
 
 pub struct RenderStore {
@@ -46,7 +46,6 @@ impl RenderStore {
             .to_vec()
             .chunks(3 * image.width() as usize)
             .map(|chunk| chunk.to_vec())
-            .into_iter()
             .rev()
             .flatten()
             .flat_map(f32::to_be_bytes)
@@ -141,7 +140,6 @@ impl RenderStore {
 
         let render_data = render_data
             .chunks(4)
-            .into_iter()
             .map(|bytes| f32::from_be_bytes(bytes.try_into().unwrap()))
             .collect();
 

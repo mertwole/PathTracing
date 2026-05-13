@@ -12,7 +12,7 @@ impl Resource for Image {
 
     fn load(data: &[u8]) -> Self {
         Image(
-            image::load_from_memory(&data)
+            image::load_from_memory(data)
                 .expect("Incorrect image format")
                 .to_rgba8(),
         )

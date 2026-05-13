@@ -9,7 +9,6 @@ use worker::api::scene::{Image, Material, Mesh, Resource, ResourceType, SceneHie
 
 struct FileReference {
     path: String,
-    md5: String,
 }
 
 pub struct Scene {
@@ -67,10 +66,7 @@ impl Scene {
 
         let file_references = loaded
             .into_iter()
-            .map(|loaded| FileReference {
-                md5: md5s.get(&loaded).unwrap().clone(),
-                path: loaded,
-            })
+            .map(|loaded| FileReference { path: loaded })
             .collect();
 
         let mut md5s: Vec<_> = md5s.into_iter().collect();
@@ -88,7 +84,7 @@ impl Scene {
         }
     }
 
-    pub async fn upload_to_mongodb(&self, mongodb_url: &str, render_task_md5: &str) {
+    pub async fn upload_to_mongodb(&self, mongodb_url: &str) {
         let mongodb_options = mongodb::options::ClientOptions::parse(mongodb_url)
             .await
             .unwrap();

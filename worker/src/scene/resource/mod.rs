@@ -74,7 +74,7 @@ impl ReferenceMapping {
             .flat_map(|(ty, ref_collection)| {
                 iter::repeat(ty)
                     .cloned()
-                    .zip(ref_collection.get_pending_processing().into_iter())
+                    .zip(ref_collection.get_pending_processing())
                     .map(|(ty, (uninit, init))| (ty, uninit, init))
                     .collect::<Vec<(_, _, _)>>()
             })

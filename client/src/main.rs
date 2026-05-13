@@ -36,18 +36,15 @@ async fn main() {
     let scene = Scene::load(&render_task.scene);
 
     let render_task = render_task.init(scene.md5.clone());
-    let render_task_md5 = render_task.md5();
 
-    scene
-        .upload_to_mongodb(&args.mongodb_url, &render_task_md5)
-        .await;
+    scene.upload_to_mongodb(&args.mongodb_url).await;
 
     let mut worker = worker::Worker::new(args.mongodb_url.clone());
     let image = worker.render(render_task).await;
 
     let image = gamma_correction(image);
 
-    let main_window = MainWindow::init(image, &render_task_md5).await;
+    let main_window = MainWindow::init(image).await;
     main_window.enter_render_loop();
 }
 
@@ -120,7 +117,7 @@ impl Framebuffer {
                                 imgui_wgpu::Texture::new(device, renderer, texture_config);
                             new_texture.write(
                                 queue,
-                                &back_image.as_raw(),
+                                back_image.as_raw(),
                                 back_image.width(),
                                 back_image.height(),
                             );
@@ -128,7 +125,7 @@ impl Framebuffer {
                         } else {
                             texture.write(
                                 queue,
-                                &back_image.as_raw(),
+                                back_image.as_raw(),
                                 back_image.width(),
                                 back_image.height(),
                             );
@@ -150,7 +147,7 @@ impl Framebuffer {
                             imgui_wgpu::Texture::new(device, renderer, texture_config);
                         new_texture.write(
                             queue,
-                            &back_image.as_raw(),
+                            back_image.as_raw(),
                             back_image.width(),
                             back_image.height(),
                         );
@@ -178,13 +175,12 @@ struct MainWindow {
     winit_platform: WinitPlatform,
 
     image: RgbaImage,
-    render_task_md5: String,
 
     framebuffer: Framebuffer,
 }
 
 impl MainWindow {
-    pub async fn init(image: RgbaImage, render_task_md5: &str) -> MainWindow {
+    pub async fn init(image: RgbaImage) -> MainWindow {
         let event_loop = EventLoop::new();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -198,7 +194,7 @@ impl MainWindow {
                 width: 1280.0,
                 height: 720.0,
             });
-            window.set_title(&format!("imgui-wgpu"));
+            window.set_title("imgui-wgpu");
             let size = window.inner_size();
 
             let surface = unsafe { instance.create_surface(&window) }.unwrap();
@@ -280,7 +276,6 @@ impl MainWindow {
             winit_platform: platform,
 
             image,
-            render_task_md5: render_task_md5.to_string(),
 
             framebuffer: Framebuffer::new(),
         }
@@ -301,11 +296,7 @@ impl MainWindow {
         let event_loop = self.event_loop.take().unwrap();
 
         event_loop.run(move |event, _, control_flow| {
-            *control_flow = if cfg!(feature = "metal-auto-capture") {
-                ControlFlow::Exit
-            } else {
-                ControlFlow::Poll
-            };
+            *control_flow = ControlFlow::Poll;
             match event {
                 Event::WindowEvent {
                     event: WindowEvent::Resized(_),
