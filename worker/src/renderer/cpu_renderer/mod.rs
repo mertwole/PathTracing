@@ -1,4 +1,4 @@
-use std::sync::{mpsc::channel, Arc};
+use std::sync::{Arc, mpsc::channel};
 
 use image::Rgb32FImage;
 use threadpool::ThreadPool;
@@ -9,7 +9,7 @@ mod image_buffer;
 mod work_group;
 
 use super::Renderer;
-use crate::{api::render_task::RenderTask, ray::Ray, render_store::RenderStore, scene::Scene};
+use crate::{api::render_task::RenderTask, ray::Ray, scene::Scene};
 use work_group::WorkGroup;
 
 pub struct RayTraceResult {
@@ -151,6 +151,7 @@ impl CPURenderer {
 
                 for buf_x in 0..workgroup_buffer.len() {
                     let glob_x = x * self.workgroup_size.x + buf_x;
+                    #[allow(clippy::needless_range_loop)]
                     for buf_y in 0..workgroup_buffer[0].len() {
                         let buf_pixel = workgroup_buffer[buf_x][buf_y];
                         let glob_y = y * self.workgroup_size.y + buf_y;
@@ -185,10 +186,9 @@ impl Renderer for CPURenderer {
         }
     }
 
-    async fn render(&mut self, render_task: Arc<RenderTask>, render_store: &RenderStore) {
+    async fn render(&mut self, render_task: Arc<RenderTask>) -> Rgb32FImage {
         (self.workgroup_count, self.workgroups) = self.divide_to_workgroups(&render_task);
         self.iterations(render_task.clone());
-        let image = self.get_image(&render_task);
-        render_store.save_render(render_task.md5(), image).await;
+        self.get_image(&render_task)
     }
 }

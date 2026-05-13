@@ -9,10 +9,10 @@ use resource::ReferenceMapping;
 use self::{
     hierarchy::{SceneNode, SceneNodeUnloaded},
     resource::{
+        ReferenceReplacer, Resource, ResourceReferenceUninit, ResourceType,
         image::Image,
         material::{BoxedMaterial, Material},
         mesh::{Mesh, MeshUninit},
-        ReferenceReplacer, Resource, ResourceReferenceUninit, ResourceType,
     },
 };
 

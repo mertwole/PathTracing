@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::ops;
 
 pub const EPSILON: f32 = 0.0001;
-pub const PI: f32 = 3.14159265359;
-pub const INV_PI: f32 = 0.31830988618;
+pub const PI: f32 = core::f32::consts::PI;
+pub const INV_PI: f32 = core::f32::consts::FRAC_1_PI;
 
 #[derive(Clone, Copy, Default, Serialize, Deserialize, Debug)]
 #[serde(expecting = "expecting [<x>, <y>] array")]
@@ -311,9 +311,9 @@ impl Vec3 {
     }
 }
 
-impl Into<Vec3> for [f32; 3] {
-    fn into(self) -> Vec3 {
-        Vec3::new(self[0], self[1], self[2])
+impl From<[f32; 3]> for Vec3 {
+    fn from(value: [f32; 3]) -> Self {
+        Vec3::new(value[0], value[1], value[2])
     }
 }
 
@@ -650,6 +650,8 @@ impl Mat4 {
 
 impl ops::Mul<Vec4> for &Mat4 {
     type Output = Vec3;
+
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: Vec4) -> Vec3 {
         let w = rhs.dot(self.row3);
         Vec3::new(rhs.dot(self.row0), rhs.dot(self.row1), rhs.dot(self.row2)) / w

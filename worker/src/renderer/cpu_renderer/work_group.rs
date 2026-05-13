@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use math::{HdrColor, UVec2, Vec3};
 
-use super::{image_buffer::ImageBuffer, GetColorResult};
+use super::{GetColorResult, image_buffer::ImageBuffer};
 use crate::{api::render_task::RenderTask, ray::Ray, scene::Scene};
 
 pub struct WorkGroup {
@@ -41,7 +41,7 @@ impl WorkGroup {
                 }
                 GetColorResult::NextRayColorMultiplierAndDirection(mul, dir) => {
                     let ray_start = trace_result.point + dir * math::EPSILON;
-                    ray = Ray::new(ray_start, dir, math::EPSILON, std::f32::MAX);
+                    ray = Ray::new(ray_start, dir, math::EPSILON, f32::MAX);
                     multiplier = multiplier * mul;
                 }
             }

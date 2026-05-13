@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = ["./client", "./math", "./worker"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["mertwole"]
+
+[workspace.dependencies]
+math = { path = "./math" }
+worker = { path = "./worker" }
