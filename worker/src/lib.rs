@@ -1,4 +1,12 @@
-use std::{collections::HashMap, iter, sync::Arc};
+use std::{collections::HashMap, iter, net::SocketAddr, sync::Arc};
+
+use file_store::FileStore;
+use futures::{SinkExt, StreamExt};
+use image::Rgb32FImage;
+use renderer::{Renderer, cpu_renderer::CPURenderer};
+use scene::Scene;
+use tokio::net::{TcpListener, TcpStream};
+use tokio_tungstenite::tungstenite::protocol::Message;
 
 pub mod api;
 mod camera;
@@ -9,10 +17,6 @@ mod renderer;
 mod scene;
 
 use api::render_task::RenderTask;
-use file_store::FileStore;
-use image::Rgb32FImage;
-use renderer::{Renderer, cpu_renderer::CPURenderer};
-use scene::Scene;
 
 pub struct RenderedImage {
     pub image: Rgb32FImage,
@@ -50,17 +54,40 @@ impl RenderedImage {
 }
 
 pub async fn start_ws(mongodb_url: &str) {
-    // let render_task = msg.to_text().unwrap();
-    //     let render_task: RenderTask = serde_json::from_str(render_task).unwrap();
+    let addr = "127.0.0.1:3000";
 
-    //     let mut worker = Worker::new(state.mongodb_url.clone());
-    //     let image = worker.render(render_task).await;
+    let try_socket = TcpListener::bind(&addr).await;
+    let listener = try_socket.expect("Failed to bind");
+    println!("Listening on: {}", addr);
 
-    //     let message = Message::binary(RenderedImage { image }.to_bytes());
+    while let Ok((stream, addr)) = listener.accept().await {
+        tokio::spawn(handle_connection(mongodb_url.to_string(), stream, addr));
+    }
+}
 
-    //     if socket.send(message).await.is_err() {
-    //         return;
-    //     }
+async fn handle_connection(mongodb_url: String, raw_stream: TcpStream, addr: SocketAddr) {
+    println!("Incoming TCP connection from: {}", addr);
+
+    let ws_stream = tokio_tungstenite::accept_async(raw_stream)
+        .await
+        .expect("Error during the websocket handshake occurred");
+    println!("WebSocket connection established: {}", addr);
+
+    let (mut outgoing, mut incoming) = ws_stream.split();
+
+    let message = incoming.next().await.unwrap().unwrap();
+    let Message::Text(message) = message else {
+        return;
+    };
+    let render_task: RenderTask = serde_json::from_str(&message.to_string()).unwrap();
+
+    let mut worker = Worker::new(mongodb_url);
+    let image = worker.render(render_task).await;
+    let image_data = RenderedImage { image }.to_bytes();
+
+    let message = Message::binary(image_data);
+
+    outgoing.send(message).await.unwrap();
 }
 
 pub struct Worker {
