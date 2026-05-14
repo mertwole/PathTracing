@@ -1,0 +1,62 @@
+use std::{net::SocketAddr, sync::Arc};
+
+use clap::Parser;
+use futures::{SinkExt, StreamExt};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    sync::Mutex,
+};
+use tokio_tungstenite::tungstenite::protocol::Message;
+
+use worker::{RenderedImage, Worker, api::render_task::RenderTask};
+
+#[derive(Parser)]
+pub struct Cli {
+    #[clap(long)]
+    mongodb_url: String,
+}
+
+#[tokio::main]
+async fn main() {
+    let args = Cli::parse();
+
+    let worker = Arc::from(Mutex::new(Worker::new(args.mongodb_url)));
+    start_ws(worker).await;
+}
+
+async fn start_ws(worker: Arc<Mutex<Worker>>) {
+    let addr = "127.0.0.1:3000";
+
+    let try_socket = TcpListener::bind(&addr).await;
+    let listener = try_socket.expect("Failed to bind");
+    println!("Listening on: {}", addr);
+
+    while let Ok((stream, addr)) = listener.accept().await {
+        tokio::spawn(handle_connection(stream, addr, worker.clone()));
+    }
+}
+
+async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, worker: Arc<Mutex<Worker>>) {
+    println!("Incoming TCP connection from: {}", addr);
+
+    let ws_stream = tokio_tungstenite::accept_async(raw_stream)
+        .await
+        .expect("Error during the websocket handshake occurred");
+    println!("WebSocket connection established: {}", addr);
+
+    let (mut outgoing, mut incoming) = ws_stream.split();
+
+    let message = incoming.next().await.unwrap().unwrap();
+
+    let Message::Text(message) = message else {
+        return;
+    };
+    let render_task: RenderTask = serde_json::from_str(&message).unwrap();
+
+    let image = worker.lock().await.render(render_task).await;
+
+    let image_data = RenderedImage { image }.to_bytes();
+    let message = Message::binary(image_data);
+
+    outgoing.send(message).await.unwrap();
+}
