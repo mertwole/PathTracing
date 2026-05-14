@@ -15,6 +15,7 @@ use winit::{
 use worker::api::render_task::RenderTaskUninit;
 
 mod scene;
+mod worker_connection;
 
 use scene::Scene;
 
@@ -39,9 +40,7 @@ async fn main() {
 
     scene.upload_to_mongodb(&args.mongodb_url).await;
 
-    let mut worker = worker::Worker::new(args.mongodb_url.clone());
-    let image = worker.render(render_task).await;
-
+    let image = worker_connection::get_image(render_task).await;
     let image = gamma_correction(image);
 
     let main_window = MainWindow::init(image).await;

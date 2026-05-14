@@ -7,11 +7,13 @@ authors.workspace = true
 [dependencies]
 math.workspace = true 
 
+futures-util = { workspace = true, features = ["sink", "std"] }
+tokio = { workspace = true, features = ["full"] }
+tokio-tungstenite.workspace = true
+
 clap = {version = "4.1.11", features = ["derive", "env"] }
 mongodb = "2.4.0"
-tokio = "1.26.0"
 futures = "0.3.27"
-futures-util = "0.3.27"
 async-trait = "0.1.68"
 threadpool = "1.8.1"
 num_cpus = "1.15.0"
