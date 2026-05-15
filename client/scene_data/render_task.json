@@ -2,12 +2,12 @@
     "scene": "./scene0.json",
     "config": {
         "trace_depth": 4,
-        "iterations": 4
+        "iterations": 1
     },
     "camera": {
         "resolution": [
-            1024,
-            1024
+            512,
+            512
         ],
         "rotation": [
             [

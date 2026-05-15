@@ -4,7 +4,11 @@ use image::{Rgb32FImage, RgbaImage};
 use imgui::*;
 use imgui_wgpu::{Renderer, RendererConfig};
 use imgui_winit_support::WinitPlatform;
-use std::{sync::Arc, sync::Mutex, time::Instant};
+use std::{
+    iter,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 use winit::{
     dpi::LogicalSize,
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -14,10 +18,13 @@ use winit::{
 
 use worker::api::render_task::RenderTaskUninit;
 
+mod frame;
 mod scene;
 mod worker_connection;
 
 use scene::Scene;
+
+use crate::frame::Frame;
 
 #[derive(Parser)]
 pub struct Cli {
@@ -40,30 +47,19 @@ async fn main() {
 
     scene.upload_to_mongodb(&args.mongodb_url).await;
 
-    let image = worker_connection::get_image(render_task).await;
-    let image = gamma_correction(image);
+    let frame = Frame::new(
+        render_task.camera.resolution.x as u32,
+        render_task.camera.resolution.y as u32,
+    )
+    .await;
+    let frame = Arc::from(frame);
 
-    let main_window = MainWindow::init(image).await;
+    let render_tasks = iter::repeat(render_task).take(100).collect();
+
+    tokio::spawn(worker_connection::get_images(render_tasks, frame.clone()));
+
+    let main_window = MainWindow::init(frame).await;
     main_window.enter_render_loop();
-}
-
-fn gamma_correction(image: Rgb32FImage) -> RgbaImage {
-    let mut gamma_corrected_image = RgbaImage::new(image.width(), image.height());
-    for x in 0..image.width() {
-        for y in 0..image.height() {
-            let res_pixel = image.get_pixel(x, y);
-            let r = (res_pixel.0[0] / (1.0 + res_pixel.0[0]) * 255.0) as u8;
-            let g = (res_pixel.0[1] / (1.0 + res_pixel.0[1]) * 255.0) as u8;
-            let b = (res_pixel.0[2] / (1.0 + res_pixel.0[2]) * 255.0) as u8;
-            let gc_pixel = gamma_corrected_image.get_pixel_mut(x, y);
-            gc_pixel.0[0] = r;
-            gc_pixel.0[1] = g;
-            gc_pixel.0[2] = b;
-            gc_pixel.0[3] = 255;
-        }
-    }
-
-    gamma_corrected_image
 }
 
 struct Framebuffer {
@@ -90,73 +86,67 @@ impl Framebuffer {
         queue: &wgpu::Queue,
         device: &wgpu::Device,
     ) -> Option<TextureId> {
-        self.front = match self.back.try_lock() {
-            Ok(ref mut guard) => {
-                if let Some(back_image) = guard.as_mut() {
-                    if let Some(front) = self.front {
-                        let texture = renderer.textures.get(front).unwrap();
-                        if texture.width() != back_image.width()
-                            || texture.height() != back_image.height()
-                        {
-                            // TODO: delete 'texture'
-                            renderer.textures.remove(front);
+        let Ok(ref mut back) = self.back.try_lock() else {
+            return self.front;
+        };
+        let Some(back_image) = back.as_mut() else {
+            return self.front;
+        };
 
-                            let texture_config = imgui_wgpu::TextureConfig {
-                                size: wgpu::Extent3d {
-                                    width: back_image.width(),
-                                    height: back_image.height(),
-                                    ..Default::default()
-                                },
-                                label: None,
-                                format: Some(wgpu::TextureFormat::Rgba8Unorm),
-                                ..Default::default()
-                            };
+        self.front = if let Some(front) = self.front {
+            let texture = renderer.textures.get(front).unwrap();
+            if texture.width() != back_image.width() || texture.height() != back_image.height() {
+                // TODO: delete 'texture'
+                renderer.textures.remove(front);
 
-                            let new_texture =
-                                imgui_wgpu::Texture::new(device, renderer, texture_config);
-                            new_texture.write(
-                                queue,
-                                back_image.as_raw(),
-                                back_image.width(),
-                                back_image.height(),
-                            );
-                            Some(renderer.textures.insert(new_texture))
-                        } else {
-                            texture.write(
-                                queue,
-                                back_image.as_raw(),
-                                back_image.width(),
-                                back_image.height(),
-                            );
-                            self.front
-                        }
-                    } else {
-                        let texture_config = imgui_wgpu::TextureConfig {
-                            size: wgpu::Extent3d {
-                                width: back_image.width(),
-                                height: back_image.height(),
-                                ..Default::default()
-                            },
-                            label: None,
-                            format: Some(wgpu::TextureFormat::Rgba8Unorm),
-                            ..Default::default()
-                        };
+                let texture_config = imgui_wgpu::TextureConfig {
+                    size: wgpu::Extent3d {
+                        width: back_image.width(),
+                        height: back_image.height(),
+                        ..Default::default()
+                    },
+                    label: None,
+                    format: Some(wgpu::TextureFormat::Rgba8Unorm),
+                    ..Default::default()
+                };
 
-                        let new_texture =
-                            imgui_wgpu::Texture::new(device, renderer, texture_config);
-                        new_texture.write(
-                            queue,
-                            back_image.as_raw(),
-                            back_image.width(),
-                            back_image.height(),
-                        );
-                        Some(renderer.textures.insert(new_texture))
-                    }
-                } else {
-                    self.front
-                }
+                let new_texture = imgui_wgpu::Texture::new(device, renderer, texture_config);
+                new_texture.write(
+                    queue,
+                    back_image.as_raw(),
+                    back_image.width(),
+                    back_image.height(),
+                );
+                Some(renderer.textures.insert(new_texture))
+            } else {
+                texture.write(
+                    queue,
+                    back_image.as_raw(),
+                    back_image.width(),
+                    back_image.height(),
+                );
+                self.front
             }
-            Err(_) => self.front,
+        } else {
+            let texture_config = imgui_wgpu::TextureConfig {
+                size: wgpu::Extent3d {
+                    width: back_image.width(),
+                    height: back_image.height(),
+                    ..Default::default()
+                },
+                label: None,
+                format: Some(wgpu::TextureFormat::Rgba8Unorm),
+                ..Default::default()
+            };
+
+            let new_texture = imgui_wgpu::Texture::new(device, renderer, texture_config);
+            new_texture.write(
+                queue,
+                back_image.as_raw(),
+                back_image.width(),
+                back_image.height(),
+            );
+            Some(renderer.textures.insert(new_texture))
         };
 
         self.front
@@ -173,13 +163,12 @@ struct MainWindow {
     imgui: imgui::Context,
     winit_platform: WinitPlatform,
 
-    image: RgbaImage,
-
+    frame: Arc<Frame>,
     framebuffer: Framebuffer,
 }
 
 impl MainWindow {
-    pub async fn init(image: RgbaImage) -> MainWindow {
+    pub async fn init(frame: Arc<Frame>) -> MainWindow {
         let event_loop = EventLoop::new();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -274,8 +263,7 @@ impl MainWindow {
             imgui,
             winit_platform: platform,
 
-            image,
-
+            frame,
             framebuffer: Framebuffer::new(),
         }
     }
@@ -357,7 +345,7 @@ impl MainWindow {
 
                     if from_last_tick.as_secs_f32() > 5.0 {
                         from_last_tick = Duration::ZERO;
-                        self.framebuffer.set_image(self.image.clone());
+                        self.framebuffer.set_image(self.frame.blocking_get_image());
                     }
 
                     let render_texture = self.framebuffer.swap_buffers(
