@@ -11,9 +11,8 @@ use crate::frame::Frame;
 type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 pub async fn get_images(render_tasks: Vec<RenderTask>, frame: Arc<Frame>) {
-    let mut connection = connect().await;
-
     for task in render_tasks {
+        let mut connection = connect().await;
         let image = get_image(&mut connection, task).await;
         frame.add_render(image).await;
     }

@@ -1,13 +1,13 @@
 {
-    "scene": "./scene0.json",
+    "scene": "./simple_scene.json",
     "config": {
-        "trace_depth": 4,
+        "trace_depth": 8,
         "iterations": 1
     },
     "camera": {
         "resolution": [
-            512,
-            512
+            1024,
+            1024
         ],
         "rotation": [
             [

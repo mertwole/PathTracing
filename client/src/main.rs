@@ -1,6 +1,6 @@
 use __core::time::Duration;
 use clap::Parser;
-use image::{Rgb32FImage, RgbaImage};
+use image::RgbaImage;
 use imgui::*;
 use imgui_wgpu::{Renderer, RendererConfig};
 use imgui_winit_support::WinitPlatform;
@@ -343,9 +343,9 @@ impl MainWindow {
                         .expect("Failed to prepare frame");
                     let ui = self.imgui.frame();
 
-                    if from_last_tick.as_secs_f32() > 5.0 {
+                    if from_last_tick.as_secs_f32() > 0.1 {
                         from_last_tick = Duration::ZERO;
-                        self.framebuffer.set_image(self.frame.blocking_get_image());
+                        self.framebuffer.set_image(self.frame.get_image());
                     }
 
                     let render_texture = self.framebuffer.swap_buffers(
