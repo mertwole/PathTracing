@@ -1,18 +1,34 @@
+use std::sync::Arc;
+
 use futures::{SinkExt, StreamExt};
 use image::Rgb32FImage;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio::net::TcpStream;
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
 use worker::{RenderedImage, api::render_task::RenderTask};
 
-pub async fn get_image(render_task: RenderTask) -> Rgb32FImage {
+use crate::frame::Frame;
+
+type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
+
+pub async fn get_images(render_tasks: Vec<RenderTask>, frame: Arc<Frame>) {
+    for task in render_tasks {
+        // TODO: Figure out how to reuse connection.
+        let mut connection = connect().await;
+        let image = get_image(&mut connection, task).await;
+        frame.add_render(image).await;
+    }
+}
+
+async fn connect() -> WsStream {
     let url = "ws://localhost:3000";
+    connect_async(url).await.unwrap().0
+}
 
-    let (stream, _) = connect_async(url).await.unwrap();
-    let (mut stream_tx, mut stream_rx) = stream.split();
-
+async fn get_image(connection: &mut WsStream, render_task: RenderTask) -> Rgb32FImage {
     let render_task = serde_json::to_string(&render_task).unwrap();
-    stream_tx.send(Message::text(render_task)).await.unwrap();
+    connection.send(Message::text(render_task)).await.unwrap();
 
-    let image = stream_rx.next().await.unwrap().unwrap();
+    let image = connection.next().await.unwrap().unwrap();
     let Message::Binary(image) = image else {
         panic!("Wrong message format");
     };
