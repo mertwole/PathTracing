@@ -54,8 +54,7 @@ async fn main() {
     .await;
     let frame = Arc::from(frame);
 
-    let render_tasks = iter::repeat(render_task).take(100).collect();
-
+    let render_tasks = iter::repeat_n(render_task, 100).collect();
     tokio::spawn(worker_connection::get_images(render_tasks, frame.clone()));
 
     let main_window = MainWindow::init(frame).await;

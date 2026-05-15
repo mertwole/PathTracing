@@ -12,6 +12,7 @@ type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 pub async fn get_images(render_tasks: Vec<RenderTask>, frame: Arc<Frame>) {
     for task in render_tasks {
+        // TODO: Figure out how to reuse connection.
         let mut connection = connect().await;
         let image = get_image(&mut connection, task).await;
         frame.add_render(image).await;
