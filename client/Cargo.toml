@@ -8,7 +8,9 @@ authors.workspace = true
 worker.workspace = true
 
 futures-util = { workspace = true, features = ["sink", "std"] }
+iced = { workspace = true, features = ["canvas", "debug", "image", "advanced"] }
 tokio = { workspace = true, features = ["full"] }
+tokio-stream = { workspace = true, features = ["sync"] }
 tokio-tungstenite.workspace = true
 
 mongodb = "2.4.0"
@@ -16,10 +18,5 @@ serde = { version = "1.0.107", features = ["derive"] }
 serde_json = "1.0.91"
 futures = "0.3.28"
 clap = {version = "4.1.11", features = ["derive", "env"] }
-imgui = "0.10.0"
-imgui-wgpu = "0.22.0"
-wgpu = "0.15.1"
-winit = "0.27.5"
-imgui-winit-support = "0.10.0"
 image = "0.24.5"
 md5 = "0.7.0"

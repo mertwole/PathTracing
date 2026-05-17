@@ -1,24 +1,30 @@
+use std::{hash::Hash, sync::Arc};
+
+use futures::Stream;
 use image::{Pixel, Rgb32FImage, RgbaImage};
 use tokio::sync::{
     Mutex,
     watch::{Receiver, Sender, channel},
 };
+use tokio_stream::wrappers::WatchStream;
 
 pub struct Frame {
     render_sum: Mutex<RenderSum>,
-    result_sender: Sender<Rgb32FImage>,
-    result_receiver: Receiver<Rgb32FImage>,
+    result_sender: Sender<RgbaImage>,
+    result_receiver: Receiver<RgbaImage>,
+}
+
+impl Hash for Frame {
+    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
 }
 
 impl Frame {
     pub async fn new(width: u32, height: u32) -> Self {
-        let empty_image = Rgb32FImage::new(width, height);
-
-        let (result_sender, result_receiver) = channel(empty_image.clone());
+        let (result_sender, result_receiver) = channel(RgbaImage::new(width, height));
 
         Self {
             render_sum: Mutex::from(RenderSum {
-                sum: empty_image.clone(),
+                sum: Rgb32FImage::new(width, height),
                 count: 0,
             }),
             result_sender,
@@ -36,12 +42,12 @@ impl Frame {
         drop(render_sum);
 
         let image = render_sum_clone.into_image();
+        let image = gamma_correction(image);
         self.result_sender.send(image).unwrap();
     }
 
-    pub fn get_image(&self) -> RgbaImage {
-        let result = self.result_receiver.borrow().clone();
-        gamma_correction(result)
+    pub fn get_image_stream(self: Arc<Self>) -> impl Stream<Item = RgbaImage> {
+        WatchStream::new(self.result_receiver.clone())
     }
 }
 
