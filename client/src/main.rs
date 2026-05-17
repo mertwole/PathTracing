@@ -19,7 +19,7 @@ pub struct Cli {
     mongodb_url: String,
 }
 
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main]
 async fn main() {
     let args = Cli::parse();
 
