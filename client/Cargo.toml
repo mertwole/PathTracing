@@ -8,7 +8,7 @@ authors.workspace = true
 worker.workspace = true
 
 futures-util = { workspace = true, features = ["sink", "std"] }
-iced = { workspace = true, features = ["canvas", "debug"] }
+iced = { workspace = true, features = ["canvas", "debug", "image", "advanced"] }
 tokio = { workspace = true, features = ["full"] }
 tokio-tungstenite.workspace = true
 

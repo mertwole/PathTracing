@@ -1,3 +1,6 @@
+use std::{hash::Hash, sync::Arc};
+
+use futures::Stream;
 use image::{Pixel, Rgb32FImage, RgbaImage};
 use tokio::sync::{
     Mutex,
@@ -7,7 +10,13 @@ use tokio::sync::{
 pub struct Frame {
     render_sum: Mutex<RenderSum>,
     result_sender: Sender<Rgb32FImage>,
-    result_receiver: Receiver<Rgb32FImage>,
+    result_receiver: Arc<Mutex<Receiver<Rgb32FImage>>>,
+}
+
+impl Hash for Frame {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        //
+    }
 }
 
 impl Frame {
@@ -22,7 +31,7 @@ impl Frame {
                 count: 0,
             }),
             result_sender,
-            result_receiver,
+            result_receiver: Arc::from(Mutex::from(result_receiver)),
         }
     }
 
@@ -39,9 +48,17 @@ impl Frame {
         self.result_sender.send(image).unwrap();
     }
 
-    pub fn get_image(&self) -> RgbaImage {
-        let result = self.result_receiver.borrow().clone();
-        gamma_correction(result)
+    async fn get_next_image(self: Arc<Self>) -> RgbaImage {
+        let mut receiver = self.result_receiver.lock().await;
+        receiver.changed().await.unwrap();
+        let image = receiver.borrow().clone();
+        gamma_correction(image)
+    }
+
+    pub fn get_image_stream(self: Arc<Self>) -> impl Stream<Item = RgbaImage> {
+        futures::stream::unfold(self, async move |frame| {
+            Some((frame.clone().get_next_image().await, frame))
+        })
     }
 }
 

@@ -19,7 +19,7 @@ pub struct Cli {
     mongodb_url: String,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let args = Cli::parse();
 
@@ -44,8 +44,5 @@ async fn main() {
     let render_tasks = iter::repeat_n(render_task, 100).collect();
     tokio::spawn(worker_connection::get_images(render_tasks, frame.clone()));
 
-    window::start().unwrap();
-
-    //let main_window = MainWindow::init(frame).await;
-    //main_window.enter_render_loop();
+    window::start(frame).unwrap();
 }

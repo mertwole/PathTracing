@@ -1,55 +1,89 @@
-use iced::keyboard;
-use iced::widget::{
-    button, canvas, center, center_y, checkbox, column, container, pick_list, pin, responsive, row,
-    rule, scrollable, space, stack, text,
-};
+use std::sync::Arc;
+
+use ::image::RgbaImage;
+use futures::StreamExt;
 use iced::{
-    Center, Element, Fill, Font, Length, Point, Rectangle, Renderer, Shrink, Subscription, Theme,
-    color,
+    Element, Subscription, Task, Theme,
+    advanced::image::Handle as ImageHandle,
+    application::BootFn,
+    widget::{column, image},
 };
 
-pub fn start() -> iced::Result {
-    iced::application(Layout::default, Layout::update, Layout::view)
-        .subscription(Layout::subscription)
-        .theme(Layout::theme)
-        .title(Layout::title)
-        .run()
+use crate::frame::Frame;
+
+pub fn start(frame: Arc<Frame>) -> iced::Result {
+    iced::application(
+        Layout {
+            frame,
+            render: None,
+        },
+        Layout::update,
+        Layout::view,
+    )
+    .subscription(Layout::subscription)
+    .theme(Layout::theme)
+    .title(Layout::title)
+    .run()
 }
 
-#[derive(Debug, Default)]
 struct Layout {
-    theme: Option<Theme>,
+    frame: Arc<Frame>,
+    render: Option<RgbaImage>,
 }
 
-#[derive(Debug, Clone)]
-enum Message {}
+#[derive(Debug)]
+enum Message {
+    NewRender(RgbaImage),
+}
+
+impl BootFn<Layout, Message> for Layout {
+    fn boot(&self) -> (Layout, Task<Message>) {
+        (
+            Layout {
+                frame: self.frame.clone(),
+                render: None,
+            },
+            Task::none(),
+        )
+    }
+}
 
 impl Layout {
     fn title(&self) -> String {
         format!("")
     }
 
-    fn update(&mut self, _message: Message) {}
+    fn update(&mut self, message: Message) {
+        match message {
+            Message::NewRender(render) => {
+                self.render = Some(render);
+            }
+        }
+    }
 
     fn subscription(&self) -> Subscription<Message> {
-        keyboard::listen().filter_map(|_event| None)
+        Subscription::run_with(self.frame.clone(), |frame| {
+            frame
+                .clone()
+                .get_image_stream()
+                .map(|image| Message::NewRender(image))
+        })
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let header = row![text("").size(20).font(Font::MONOSPACE), space::horizontal(),]
-            .spacing(20)
-            .align_y(Center);
+        let render = match &self.render {
+            Some(render) => column![image(ImageHandle::from_rgba(
+                render.width(),
+                render.height(),
+                render.to_vec(),
+            ))],
+            None => column![],
+        };
 
-        let example = centered();
-
-        column![header, example].spacing(10).padding(20).into()
+        render.into()
     }
 
     fn theme(&self) -> Option<Theme> {
-        self.theme.clone()
+        None
     }
-}
-
-fn centered<'a>() -> Element<'a, Message> {
-    center(text("I am centered!").size(50)).into()
 }
