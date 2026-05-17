@@ -49,7 +49,7 @@ impl BootFn<Layout, Message> for Layout {
 
 impl Layout {
     fn title(&self) -> String {
-        format!("")
+        "".to_string()
     }
 
     fn update(&mut self, message: Message) {
@@ -62,10 +62,7 @@ impl Layout {
 
     fn subscription(&self) -> Subscription<Message> {
         Subscription::run_with(self.frame.clone(), |frame| {
-            frame
-                .clone()
-                .get_image_stream()
-                .map(|image| Message::NewRender(image))
+            frame.clone().get_image_stream().map(Message::NewRender)
         })
     }
 
