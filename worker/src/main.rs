@@ -25,7 +25,7 @@ async fn main() {
 }
 
 async fn start_ws(worker: Arc<Mutex<Worker>>) {
-    let addr = "127.0.0.1:3000";
+    let addr = "127.0.0.1:30000";
 
     let try_socket = TcpListener::bind(&addr).await;
     let listener = try_socket.expect("Failed to bind");
