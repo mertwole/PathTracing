@@ -15,9 +15,7 @@ pub struct Frame {
 }
 
 impl Hash for Frame {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        //
-    }
+    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
 }
 
 impl Frame {

@@ -3,10 +3,10 @@ use std::sync::Arc;
 use ::image::RgbaImage;
 use futures::StreamExt;
 use iced::{
-    Element, Subscription, Task, Theme,
+    Element, Subscription, Task,
     advanced::image::Handle as ImageHandle,
     application::BootFn,
-    widget::{column, image},
+    widget::{center, column, image},
 };
 
 use crate::frame::Frame;
@@ -21,7 +21,6 @@ pub fn start(frame: Arc<Frame>) -> iced::Result {
         Layout::view,
     )
     .subscription(Layout::subscription)
-    .theme(Layout::theme)
     .title(Layout::title)
     .run()
 }
@@ -80,10 +79,6 @@ impl Layout {
             None => column![],
         };
 
-        render.into()
-    }
-
-    fn theme(&self) -> Option<Theme> {
-        None
+        center(render).padding(10).into()
     }
 }
