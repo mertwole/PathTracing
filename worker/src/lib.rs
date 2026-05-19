@@ -84,5 +84,7 @@ pub mod discovery {
     pub struct Request {}
 
     #[derive(Serialize, Deserialize, Debug)]
-    pub struct Response {}
+    pub struct Response {
+        pub websocket_port: u16,
+    }
 }

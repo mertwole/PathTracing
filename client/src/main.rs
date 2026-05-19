@@ -13,6 +13,8 @@ use scene::Scene;
 
 use crate::frame::Frame;
 
+const BROADCAST_PORT: u16 = 40000;
+
 #[derive(Parser)]
 pub struct Cli {
     #[clap(long)]
@@ -42,7 +44,7 @@ async fn main() {
     let frame = Arc::from(frame);
 
     let mut worker_pool = worker_pool::WorkerPool::new();
-    worker_pool.discover(30000).await;
+    worker_pool.discover(BROADCAST_PORT).await;
 
     let frame_clone = frame.clone();
     tokio::spawn(async move {

@@ -30,12 +30,9 @@ impl WorkerPool {
     }
 
     pub async fn discover(&mut self, port: u16) {
-        let socket = UdpSocket::bind(SocketAddrV4::new(
-            Ipv4Addr::from_octets([127, 0, 0, 1]),
-            port,
-        ))
-        .await
-        .unwrap();
+        let socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::from_octets([0, 0, 0, 0]), 0))
+            .await
+            .unwrap();
         socket.set_broadcast(true).unwrap();
 
         let request = DiscoveryRequest {};
@@ -55,9 +52,11 @@ impl WorkerPool {
     async fn listen_for_workers(&mut self, socket: &UdpSocket) {
         // TODO: Get the size of response.
         let mut buf = vec![0; 1024];
-        let (length, worker_address) = socket.recv_from(&mut buf[..]).await.unwrap();
+        let (length, mut worker_address) = socket.recv_from(&mut buf[..]).await.unwrap();
 
-        let _response: DiscoveryResponse = postcard::from_bytes(&buf[..length]).unwrap();
+        let response: DiscoveryResponse = postcard::from_bytes(&buf[..length]).unwrap();
+        worker_address.set_port(response.websocket_port);
+
         self.workers.push(Worker {
             address: worker_address,
         });
@@ -88,6 +87,7 @@ impl Worker {
 
 async fn connect(address: SocketAddr) -> WsStream {
     let url = format!("ws://{}", address.to_string());
+    println!("Connecting to worker {}", url);
     connect_async(url).await.unwrap().0
 }
 

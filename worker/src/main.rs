@@ -3,12 +3,15 @@ use std::{net::SocketAddr, sync::Arc};
 use clap::Parser;
 use futures::{SinkExt, StreamExt};
 use tokio::{
-    net::{TcpListener, TcpStream},
+    net::{TcpListener, TcpStream, UdpSocket},
     sync::Mutex,
 };
 use tokio_tungstenite::tungstenite::protocol::Message;
 
 use worker::{RenderedImage, Worker, api::render_task::RenderTask};
+
+const WEBSOCKET_PORT: u16 = 30000;
+const BROADCAST_PORT: u16 = 40000;
 
 #[derive(Parser)]
 pub struct Cli {
@@ -25,11 +28,13 @@ async fn main() {
 }
 
 async fn start_ws(worker: Arc<Mutex<Worker>>) {
-    let addr = "127.0.0.1:30000";
+    let addr = format!("0.0.0.0:{}", WEBSOCKET_PORT);
 
     let try_socket = TcpListener::bind(&addr).await;
     let listener = try_socket.expect("Failed to bind");
     println!("Listening on: {}", addr);
+
+    tokio::spawn(listen_discovery_broadcasts());
 
     while let Ok((stream, addr)) = listener.accept().await {
         tokio::spawn(handle_connection(stream, addr, worker.clone()));
@@ -59,4 +64,21 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, worker: Arc<
     let message = Message::binary(image_data);
 
     outgoing.send(message).await.unwrap();
+}
+
+async fn listen_discovery_broadcasts() {
+    let socket = UdpSocket::bind(&format!("0.0.0.0:{}", BROADCAST_PORT))
+        .await
+        .unwrap();
+    socket.set_broadcast(true).unwrap();
+    // TODO: Determine len.
+    let mut buffer = vec![0; 1024];
+    let (len, sender) = socket.recv_from(&mut buffer[..]).await.unwrap();
+    let _request: worker::discovery::Request = postcard::from_bytes(&buffer[..len]).unwrap();
+
+    let response = worker::discovery::Response {
+        websocket_port: WEBSOCKET_PORT,
+    };
+    let response = postcard::to_allocvec(&response).unwrap();
+    socket.send_to(&response, sender).await.unwrap();
 }
