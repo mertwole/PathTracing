@@ -1,4 +1,4 @@
-use std::{iter, sync::Arc};
+use std::sync::Arc;
 
 use clap::Parser;
 
@@ -7,11 +7,13 @@ use worker::api::render_task::RenderTaskUninit;
 mod frame;
 mod scene;
 mod window;
-mod worker_connection;
+mod worker_pool;
 
 use scene::Scene;
 
 use crate::frame::Frame;
+
+const BROADCAST_PORT: u16 = 40000;
 
 #[derive(Parser)]
 pub struct Cli {
@@ -41,8 +43,17 @@ async fn main() {
     .await;
     let frame = Arc::from(frame);
 
-    let render_tasks = iter::repeat_n(render_task, 100).collect();
-    tokio::spawn(worker_connection::get_images(render_tasks, frame.clone()));
+    let mut worker_pool = worker_pool::WorkerPool::new();
+    worker_pool.discover(BROADCAST_PORT).await;
+
+    let frame_clone = frame.clone();
+    tokio::spawn(async move {
+        loop {
+            worker_pool
+                .send_render_task(render_task.clone(), frame_clone.clone())
+                .await;
+        }
+    });
 
     window::start(frame).unwrap();
 }

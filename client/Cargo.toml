@@ -9,6 +9,7 @@ worker.workspace = true
 
 futures-util = { workspace = true, features = ["sink", "std"] }
 iced = { workspace = true, features = ["canvas", "debug", "image", "advanced"] }
+postcard.workspace = true
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true, features = ["sync"] }
 tokio-tungstenite.workspace = true

@@ -8,6 +8,7 @@ authors.workspace = true
 math.workspace = true 
 
 futures-util = { workspace = true, features = ["sink", "std"] }
+postcard = { workspace = true, features = ["use-std"] }
 tokio = { workspace = true, features = ["full"] }
 tokio-tungstenite.workspace = true
 

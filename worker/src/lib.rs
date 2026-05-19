@@ -76,3 +76,15 @@ impl RenderedImage {
         Self { image }
     }
 }
+
+pub mod discovery {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct Request {}
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct Response {
+        pub websocket_port: u16,
+    }
+}
