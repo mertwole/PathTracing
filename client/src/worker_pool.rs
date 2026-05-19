@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     sync::Arc,
     time::Duration,
@@ -21,12 +22,14 @@ const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(2);
 type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 pub struct WorkerPool {
-    workers: Vec<Worker>,
+    workers: HashSet<Worker>,
 }
 
 impl WorkerPool {
     pub fn new() -> WorkerPool {
-        WorkerPool { workers: vec![] }
+        WorkerPool {
+            workers: HashSet::new(),
+        }
     }
 
     pub async fn discover(&mut self, port: u16) {
@@ -57,9 +60,10 @@ impl WorkerPool {
         let response: DiscoveryResponse = postcard::from_bytes(&buf[..length]).unwrap();
         worker_address.set_port(response.websocket_port);
 
-        self.workers.push(Worker {
+        let worker = Worker {
             address: worker_address,
-        });
+        };
+        self.workers.insert(worker);
 
         println!("Worker discovered: {}", worker_address);
     }
@@ -72,6 +76,7 @@ impl WorkerPool {
     }
 }
 
+#[derive(PartialEq, Eq, Hash)]
 struct Worker {
     address: SocketAddr,
 }
@@ -86,7 +91,7 @@ impl Worker {
 }
 
 async fn connect(address: SocketAddr) -> WsStream {
-    let url = format!("ws://{}", address.to_string());
+    let url = format!("ws://{}", address);
     println!("Connecting to worker {}", url);
     connect_async(url).await.unwrap().0
 }
