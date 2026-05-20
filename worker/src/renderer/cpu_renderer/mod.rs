@@ -155,6 +155,7 @@ impl CPURenderer {
                     for buf_y in 0..workgroup_buffer[0].len() {
                         let buf_pixel = workgroup_buffer[buf_x][buf_y];
                         let glob_y = y * self.workgroup_size.y + buf_y;
+                        let glob_y = render_task.camera.resolution.y - 1 - glob_y;
                         let glob_adress = glob_x + glob_y * render_task.camera.resolution.x;
 
                         buffer[glob_adress * 3] = buf_pixel.r;
