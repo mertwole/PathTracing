@@ -43,11 +43,11 @@ async fn main() {
     .await;
     let frame = Arc::from(frame);
 
-    let mut worker_pool = worker_pool::WorkerPool::new();
-    worker_pool.discover(BROADCAST_PORT).await;
-
     let frame_clone = frame.clone();
     tokio::spawn(async move {
+        let mut worker_pool = worker_pool::WorkerPool::new();
+        worker_pool.discover(BROADCAST_PORT).await;
+
         loop {
             worker_pool
                 .send_render_task(render_task.clone(), frame_clone.clone())
