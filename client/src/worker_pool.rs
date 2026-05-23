@@ -1,13 +1,18 @@
 use std::{
     collections::HashSet,
+    hash::Hash,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     sync::Arc,
     time::Duration,
 };
 
-use futures::{SinkExt, StreamExt};
+use futures::{SinkExt, Stream, StreamExt};
 use image::Rgb32FImage;
-use tokio::net::{TcpStream, UdpSocket};
+use tokio::{
+    net::{TcpStream, UdpSocket},
+    sync::watch,
+};
+use tokio_stream::wrappers::WatchStream;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
 use worker::{
     RenderedImage,
@@ -17,19 +22,64 @@ use worker::{
 
 use crate::frame::Frame;
 
-const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(2);
+const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(5);
 
 type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 pub struct WorkerPool {
     workers: HashSet<Worker>,
+    stats_sender: StatsSender,
+}
+
+struct StatsSender {
+    workers: watch::Sender<Vec<SocketAddr>>,
+}
+
+impl StatsSender {
+    fn notify_new_worker_addresses(&self, addresses: Vec<SocketAddr>) {
+        self.workers.send(addresses).unwrap();
+    }
+}
+
+impl Default for StatsSender {
+    fn default() -> Self {
+        Self {
+            workers: watch::Sender::new(vec![]),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Stats {
+    workers: watch::Receiver<Vec<SocketAddr>>,
+}
+
+impl Hash for Stats {
+    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
+}
+
+impl Stats {
+    fn from_sender(sender: &StatsSender) -> Self {
+        Self {
+            workers: sender.workers.subscribe(),
+        }
+    }
+
+    pub fn get_worker_addresses_stream(self) -> impl Stream<Item = Vec<SocketAddr>> {
+        WatchStream::new(self.workers.clone())
+    }
 }
 
 impl WorkerPool {
     pub fn new() -> WorkerPool {
         WorkerPool {
             workers: HashSet::new(),
+            stats_sender: StatsSender::default(),
         }
+    }
+
+    pub fn get_stats(&self) -> Stats {
+        Stats::from_sender(&self.stats_sender)
     }
 
     pub async fn discover(&mut self, port: u16) {
@@ -64,6 +114,10 @@ impl WorkerPool {
             address: worker_address,
         };
         self.workers.insert(worker);
+
+        self.stats_sender.notify_new_worker_addresses(
+            self.workers.iter().map(|worker| worker.address).collect(),
+        );
 
         println!("Worker discovered: {}", worker_address);
     }

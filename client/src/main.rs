@@ -9,9 +9,8 @@ mod scene;
 mod window;
 mod worker_pool;
 
+use frame::Frame;
 use scene::Scene;
-
-use crate::frame::Frame;
 
 const BROADCAST_PORT: u16 = 40000;
 
@@ -44,8 +43,9 @@ async fn main() {
     let frame = Arc::from(frame);
 
     let frame_clone = frame.clone();
+    let mut worker_pool = worker_pool::WorkerPool::new();
+    let worker_pool_stats = worker_pool.get_stats();
     tokio::spawn(async move {
-        let mut worker_pool = worker_pool::WorkerPool::new();
         worker_pool.discover(BROADCAST_PORT).await;
 
         loop {
@@ -55,5 +55,5 @@ async fn main() {
         }
     });
 
-    window::start(frame).unwrap();
+    window::start(frame, worker_pool_stats).unwrap();
 }
