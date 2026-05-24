@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use clap::Parser;
 
@@ -11,8 +11,6 @@ mod worker_pool;
 
 use frame::Frame;
 use scene::Scene;
-
-const BROADCAST_PORT: u16 = 40000;
 
 #[derive(Parser)]
 pub struct Cli {
@@ -42,18 +40,15 @@ async fn main() {
     .await;
     let frame = Arc::from(frame);
 
-    let frame_clone = frame.clone();
-    let mut worker_pool = worker_pool::WorkerPool::new();
-    let worker_pool_stats = worker_pool.get_stats();
-    tokio::spawn(async move {
-        worker_pool.discover(BROADCAST_PORT).await;
+    let worker_pool = worker_pool::start(frame.clone());
+    let wokrer_pool_clone = worker_pool.clone();
 
+    tokio::spawn(async move {
         loop {
-            worker_pool
-                .send_render_task(render_task.clone(), frame_clone.clone())
-                .await;
+            let _ = wokrer_pool_clone.send_render_task(render_task.clone());
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
     });
 
-    window::start(frame, worker_pool_stats).unwrap();
+    window::start(frame, worker_pool).unwrap();
 }
