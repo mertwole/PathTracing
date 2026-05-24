@@ -3,20 +3,23 @@ use std::{net::SocketAddr, sync::Arc};
 use ::image::RgbaImage;
 use futures::StreamExt;
 use iced::{
-    Element, Subscription, Task,
+    Alignment, Element, Subscription, Task,
     advanced::image::Handle as ImageHandle,
     application::BootFn,
-    widget::{center, column, container, container::Style, image, text},
+    widget::{self, button, center, column, container, container::Style, image, row, text},
 };
 use iced_aw::{TabLabel, Tabs};
 
-use crate::{frame::Frame, worker_pool::Stats as WorkerPoolStats};
+use crate::{
+    frame::Frame,
+    worker_pool::{self},
+};
 
-pub fn start(frame: Arc<Frame>, worker_pool_stats: WorkerPoolStats) -> iced::Result {
+pub fn start(frame: Arc<Frame>, worker_pool: worker_pool::Handle) -> iced::Result {
     iced::application(
         Layout {
             frame,
-            worker_pool_stats,
+            worker_pool,
             active_tab: Default::default(),
             render: None,
             worker_addresses: vec![],
@@ -31,17 +34,19 @@ pub fn start(frame: Arc<Frame>, worker_pool_stats: WorkerPoolStats) -> iced::Res
 
 struct Layout {
     frame: Arc<Frame>,
-    worker_pool_stats: WorkerPoolStats,
+    worker_pool: worker_pool::Handle,
 
     active_tab: TabId,
     render: Option<RgbaImage>,
     worker_addresses: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Message {
+    // TODO: Box RgbaImage.
     NewRender(RgbaImage),
     WorkerPoolStatsChanged(Vec<SocketAddr>),
+    StartWorkerDiscovery,
     TabSelected(TabId),
 }
 
@@ -57,7 +62,7 @@ impl BootFn<Layout, Message> for Layout {
         (
             Layout {
                 frame: self.frame.clone(),
-                worker_pool_stats: self.worker_pool_stats.clone(),
+                worker_pool: self.worker_pool.clone(),
                 active_tab: Default::default(),
                 render: None,
                 worker_addresses: vec![],
@@ -83,6 +88,9 @@ impl Layout {
                     .map(|address| format!("{address}"))
                     .collect();
             }
+            Message::StartWorkerDiscovery => {
+                self.worker_pool.discover();
+            }
             Message::TabSelected(tab) => {
                 self.active_tab = tab;
             }
@@ -91,10 +99,8 @@ impl Layout {
 
     fn subscription(&self) -> Subscription<Message> {
         Subscription::batch(vec![
-            Subscription::run_with(self.worker_pool_stats.clone(), |stats| {
-                stats
-                    .clone()
-                    .get_worker_addresses_stream()
+            Subscription::run_with(self.worker_pool.clone(), |pool| {
+                pool.get_worker_discovery_stream()
                     .map(Message::WorkerPoolStatsChanged)
             }),
             Subscription::run_with(self.frame.clone(), |frame| {
@@ -134,6 +140,12 @@ fn render_tab(render: &Option<RgbaImage>) -> Element<'_, Message> {
 }
 
 fn workers_tab(addresses: &[String]) -> Element<'_, Message> {
+    let discover = button("discover workers").on_press(Message::StartWorkerDiscovery);
+    let discover = container(discover)
+        .padding(8)
+        .align_x(Alignment::Start)
+        .align_y(Alignment::Start);
+
     let entries: Vec<_> = addresses
         .iter()
         .map(|address| {
@@ -141,15 +153,17 @@ fn workers_tab(addresses: &[String]) -> Element<'_, Message> {
                 .padding(8)
                 .style(|theme| Style {
                     border: iced::Border::default().rounded(8),
-                    ..container::rounded_box(theme)
+                    ..widget::container::rounded_box(theme)
                 })
                 .into()
         })
         .collect();
 
-    if addresses.is_empty() {
-        center(text("No workers found")).into()
+    let worker_list = if addresses.is_empty() {
+        center(text("No workers found"))
     } else {
-        center(column(entries).spacing(8)).into()
-    }
+        center(column(entries).spacing(8))
+    };
+
+    row![discover, worker_list].into()
 }
