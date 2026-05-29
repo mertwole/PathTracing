@@ -227,6 +227,7 @@ impl Scheduler {
             for i in (0..workers.len()).rev() {
                 let (_, worker) = &mut workers[i];
                 if let Err(err) = worker.get_image(task.clone(), self.frame.clone()).await {
+                    // TODO: Notify the worker pool user about disconnected workers.
                     println!("Error during message exchange: {}", err);
                     workers.remove(i);
                 };
