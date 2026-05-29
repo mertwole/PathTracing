@@ -150,7 +150,12 @@ impl Finder {
             .await
             .unwrap();
 
-        let _ = timeout(DISCOVERY_TIMEOUT, self.listen_for_workers(&socket)).await;
+        let _ = timeout(DISCOVERY_TIMEOUT, async {
+            loop {
+                self.listen_for_workers(&socket).await
+            }
+        })
+        .await;
     }
 
     async fn listen_for_workers(&self, socket: &UdpSocket) {
