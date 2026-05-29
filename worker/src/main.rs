@@ -71,14 +71,17 @@ async fn listen_discovery_broadcasts() {
         .await
         .unwrap();
     socket.set_broadcast(true).unwrap();
-    // TODO: Determine len.
-    let mut buffer = vec![0; 1024];
-    let (len, sender) = socket.recv_from(&mut buffer[..]).await.unwrap();
-    let _request: worker::discovery::Request = postcard::from_bytes(&buffer[..len]).unwrap();
 
-    let response = worker::discovery::Response {
-        websocket_port: WEBSOCKET_PORT,
-    };
-    let response = postcard::to_allocvec(&response).unwrap();
-    socket.send_to(&response, sender).await.unwrap();
+    loop {
+        // TODO: Determine len.
+        let mut buffer = vec![0; 1024];
+        let (len, sender) = socket.recv_from(&mut buffer[..]).await.unwrap();
+        let _request: worker::discovery::Request = postcard::from_bytes(&buffer[..len]).unwrap();
+
+        let response = worker::discovery::Response {
+            websocket_port: WEBSOCKET_PORT,
+        };
+        let response = postcard::to_allocvec(&response).unwrap();
+        socket.send_to(&response, sender).await.unwrap();
+    }
 }
