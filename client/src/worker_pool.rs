@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use anyhow::Context;
 use futures::{SinkExt, StreamExt};
 use tokio::{
     net::{TcpStream, UdpSocket},
@@ -207,12 +208,14 @@ impl Scheduler {
         let mut discovered_workers = self.discovered_workers;
         let workers_map = self.workers.clone();
         tokio::spawn(async move {
-            let worker_descriptor = discovered_workers.recv().await.unwrap();
-            let worker = Worker::connect(&worker_descriptor).await;
-            workers_map
-                .write()
-                .await
-                .insert(worker_descriptor.clone(), worker);
+            loop {
+                let worker_descriptor = discovered_workers.recv().await.unwrap();
+                let worker = Worker::connect(&worker_descriptor).await;
+                workers_map
+                    .write()
+                    .await
+                    .insert(worker_descriptor.clone(), worker);
+            }
         });
 
         loop {
@@ -220,9 +223,15 @@ impl Scheduler {
 
             let mut workers: Vec<_> = self.workers.write().await.drain().collect();
             // TODO: Distribute render tasks.
-            for (_descriptor, worker) in &mut workers {
-                worker.get_image(task.clone(), self.frame.clone()).await;
+            // TODO: Parallelize.
+            for i in (0..workers.len()).rev() {
+                let (_, worker) = &mut workers[i];
+                if let Err(err) = worker.get_image(task.clone(), self.frame.clone()).await {
+                    println!("Error during message exchange: {}", err);
+                    workers.remove(i);
+                };
             }
+
             self.workers.write().await.extend(workers);
         }
     }
@@ -246,20 +255,32 @@ impl Worker {
         Self { connection }
     }
 
-    async fn get_image(&mut self, render_task: RenderTask, frame: Arc<Frame>) {
-        let render_task = serde_json::to_string(&render_task).unwrap();
+    async fn get_image(
+        &mut self,
+        render_task: RenderTask,
+        frame: Arc<Frame>,
+    ) -> anyhow::Result<()> {
+        let render_task =
+            serde_json::to_string(&render_task).expect("Failed to serialze render task");
         self.connection
             .send(Message::text(render_task))
             .await
-            .unwrap();
+            .context("Failed to send render task")?;
 
-        let image = self.connection.next().await.unwrap().unwrap();
+        // TODO: Process case when connection was gracefully closed.
+        let image = self
+            .connection
+            .next()
+            .await
+            .unwrap()
+            .context("Failed to receive image")?;
         let Message::Binary(image) = image else {
-            panic!("Wrong message format");
+            anyhow::bail!("Unexpected message format");
         };
 
         let image = RenderedImage::from_bytes(image.to_vec()).image;
-
         frame.add_render(image).await;
+
+        Ok(())
     }
 }

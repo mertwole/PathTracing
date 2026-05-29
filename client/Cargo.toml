@@ -7,6 +7,7 @@ authors.workspace = true
 [dependencies]
 worker.workspace = true
 
+anyhow.workspace = true
 futures-util = { workspace = true, features = ["sink", "std"] }
 iced = { workspace = true, features = ["canvas", "debug", "image", "advanced"] }
 iced_aw = { workspace = true, features = ["full"] }
