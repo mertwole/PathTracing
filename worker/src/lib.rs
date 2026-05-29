@@ -35,6 +35,7 @@ impl Worker {
             let scene = Scene::load(&file_store, &render_task.scene).await;
             self.cached_scenes
                 .insert(render_task.scene_md5.clone(), Arc::from(scene));
+            println!("Scene files loaded");
         } else {
             println!("Scene files found locally");
         }

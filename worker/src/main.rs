@@ -1,17 +1,23 @@
 use std::{net::SocketAddr, sync::Arc};
 
+use anyhow::Context;
 use clap::Parser;
-use futures::{SinkExt, StreamExt};
+use futures::{
+    SinkExt, StreamExt,
+    stream::{SplitSink, SplitStream},
+};
 use tokio::{
     net::{TcpListener, TcpStream, UdpSocket},
     sync::Mutex,
 };
-use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Message};
 
 use worker::{RenderedImage, Worker, api::render_task::RenderTask};
 
 const WEBSOCKET_PORT: u16 = 30000;
 const BROADCAST_PORT: u16 = 40000;
+
+type WsStream = WebSocketStream<TcpStream>;
 
 #[derive(Parser)]
 pub struct Cli {
@@ -51,19 +57,39 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, worker: Arc<
 
     let (mut outgoing, mut incoming) = ws_stream.split();
 
-    let message = incoming.next().await.unwrap().unwrap();
+    loop {
+        if let Err(err) = connection_loop(&mut outgoing, &mut incoming, worker.clone()).await {
+            println!("Error during message exchange: {}", err);
+            break;
+        }
+    }
+}
+
+async fn connection_loop(
+    outgoing: &mut SplitSink<WsStream, Message>,
+    incoming: &mut SplitStream<WsStream>,
+    worker: Arc<Mutex<Worker>>,
+) -> anyhow::Result<()> {
+    // TODO: Process case when connection was gracefully closed.
+    let message = incoming.next().await.unwrap()?;
 
     let Message::Text(message) = message else {
-        return;
+        anyhow::bail!("Unexpected message format");
     };
-    let render_task: RenderTask = serde_json::from_str(&message).unwrap();
+    let render_task: RenderTask = serde_json::from_str(&message)
+        .map_err(|err| anyhow::anyhow!("Failed to decode render task: {}", err))?;
 
     let image = worker.lock().await.render(render_task).await;
 
     let image_data = RenderedImage { image }.to_bytes();
     let message = Message::binary(image_data);
 
-    outgoing.send(message).await.unwrap();
+    outgoing
+        .send(message)
+        .await
+        .context("Failed to send render result")?;
+
+    Ok(())
 }
 
 async fn listen_discovery_broadcasts() {
@@ -71,14 +97,17 @@ async fn listen_discovery_broadcasts() {
         .await
         .unwrap();
     socket.set_broadcast(true).unwrap();
-    // TODO: Determine len.
-    let mut buffer = vec![0; 1024];
-    let (len, sender) = socket.recv_from(&mut buffer[..]).await.unwrap();
-    let _request: worker::discovery::Request = postcard::from_bytes(&buffer[..len]).unwrap();
 
-    let response = worker::discovery::Response {
-        websocket_port: WEBSOCKET_PORT,
-    };
-    let response = postcard::to_allocvec(&response).unwrap();
-    socket.send_to(&response, sender).await.unwrap();
+    loop {
+        // TODO: Determine len.
+        let mut buffer = vec![0; 1024];
+        let (len, sender) = socket.recv_from(&mut buffer[..]).await.unwrap();
+        let _request: worker::discovery::Request = postcard::from_bytes(&buffer[..len]).unwrap();
+
+        let response = worker::discovery::Response {
+            websocket_port: WEBSOCKET_PORT,
+        };
+        let response = postcard::to_allocvec(&response).unwrap();
+        socket.send_to(&response, sender).await.unwrap();
+    }
 }

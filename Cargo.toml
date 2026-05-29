@@ -11,6 +11,7 @@ authors = ["mertwole"]
 math = { path = "./math" }
 worker = { path = "./worker" }
 
+anyhow = { version = "1.0.102", default-features = false }
 futures-util = { version = "0.3", default-features = false }
 iced = "0.14.0"
 iced_aw = { version = "0.14.0", default-features = false }
