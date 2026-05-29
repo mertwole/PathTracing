@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     hash::Hash,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     sync::Arc,
@@ -7,7 +7,6 @@ use std::{
 };
 
 use futures::{SinkExt, StreamExt};
-use image::Rgb32FImage;
 use tokio::{
     net::{TcpStream, UdpSocket},
     sync::{RwLock, mpsc, watch},
@@ -25,6 +24,7 @@ use crate::frame::Frame;
 
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(5);
 const DISCOVERY_PORT: u16 = 40000;
+const WORKERS_DISCOVERY_CHANNEL_BUFFER: usize = 8;
 
 type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
@@ -85,30 +85,26 @@ impl Pool {
     fn new(
         frame: Arc<Frame>,
         discovery_requests: watch::Receiver<()>,
-        dicovered_workers_sender: watch::Sender<Vec<SocketAddr>>,
+        discovered_workers_watch: watch::Sender<Vec<SocketAddr>>,
         render_tasks: mpsc::Receiver<RenderTask>,
     ) -> Pool {
         let workers = Arc::from(RwLock::new(HashSet::new()));
+        let (discovered_workers_sender, discovered_workers_receiver) =
+            mpsc::channel(WORKERS_DISCOVERY_CHANNEL_BUFFER);
 
         let finder = Finder {
             workers: workers.clone(),
             discovery_requests,
-            dicovered_workers_sender,
+            discovered_workers_watch,
+            discovered_workers_sender,
         };
-        let scheduler = Scheduler {
-            workers: workers.clone(),
-            frame,
-            render_tasks,
-        };
+        let scheduler = Scheduler::new(discovered_workers_receiver, frame, render_tasks);
 
         Pool { finder, scheduler }
     }
 
     async fn run(self) {
-        let Self {
-            finder,
-            mut scheduler,
-        } = self;
+        let Self { finder, scheduler } = self;
 
         tokio::select! {
             _ = finder.run_discovery(DISCOVERY_PORT) => {},
@@ -118,10 +114,11 @@ impl Pool {
 }
 
 struct Finder {
-    workers: Arc<RwLock<HashSet<Worker>>>,
+    workers: Arc<RwLock<HashSet<WorkerDescriptor>>>,
 
     discovery_requests: watch::Receiver<()>,
-    dicovered_workers_sender: watch::Sender<Vec<SocketAddr>>,
+    discovered_workers_watch: watch::Sender<Vec<SocketAddr>>,
+    discovered_workers_sender: mpsc::Sender<WorkerDescriptor>,
 }
 
 impl Finder {
@@ -166,71 +163,103 @@ impl Finder {
         let response: DiscoveryResponse = postcard::from_bytes(&buf[..length]).unwrap();
         worker_address.set_port(response.websocket_port);
 
-        let worker = Worker {
+        let worker = WorkerDescriptor {
             address: worker_address,
         };
 
         println!("Worker discovered: {}", worker_address);
 
         let mut workers = self.workers.read().await.clone();
-        workers.insert(worker);
+        workers.insert(worker.clone());
         *(self.workers.write().await) = workers.clone();
 
-        self.dicovered_workers_sender
+        self.discovered_workers_sender.send(worker).await.unwrap();
+
+        self.discovered_workers_watch
             .send(workers.iter().map(|worker| worker.address).collect())
             .unwrap();
     }
 }
 
 struct Scheduler {
-    workers: Arc<RwLock<HashSet<Worker>>>,
+    discovered_workers: mpsc::Receiver<WorkerDescriptor>,
+    workers: Arc<RwLock<HashMap<WorkerDescriptor, Worker>>>,
     frame: Arc<Frame>,
 
     render_tasks: mpsc::Receiver<RenderTask>,
 }
 
 impl Scheduler {
-    async fn schedule_render_tasks(&mut self) {
+    fn new(
+        discovered_workers: mpsc::Receiver<WorkerDescriptor>,
+        frame: Arc<Frame>,
+        render_tasks: mpsc::Receiver<RenderTask>,
+    ) -> Self {
+        Self {
+            discovered_workers,
+            workers: Arc::from(RwLock::new(HashMap::new())),
+            frame,
+            render_tasks,
+        }
+    }
+
+    async fn schedule_render_tasks(mut self) {
+        let mut discovered_workers = self.discovered_workers;
+        let workers_map = self.workers.clone();
+        tokio::spawn(async move {
+            let worker_descriptor = discovered_workers.recv().await.unwrap();
+            let worker = Worker::connect(&worker_descriptor).await;
+            workers_map
+                .write()
+                .await
+                .insert(worker_descriptor.clone(), worker);
+        });
+
         loop {
             let task = self.render_tasks.recv().await.unwrap();
 
-            let workers = self.workers.read().await.clone();
+            let mut workers: Vec<_> = self.workers.write().await.drain().collect();
             // TODO: Distribute render tasks.
-            for worker in workers {
+            for (_descriptor, worker) in &mut workers {
                 worker.get_image(task.clone(), self.frame.clone()).await;
             }
+            self.workers.write().await.extend(workers);
         }
     }
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-struct Worker {
+struct WorkerDescriptor {
     address: SocketAddr,
 }
 
+struct Worker {
+    connection: WsStream,
+}
+
 impl Worker {
-    async fn get_image(&self, render_task: RenderTask, frame: Arc<Frame>) {
-        // TODO: Don't drop connection.
-        let mut connection = connect(self.address).await;
-        let image = get_image(&mut connection, render_task).await;
+    async fn connect(descriptor: &WorkerDescriptor) -> Self {
+        let url = format!("ws://{}", descriptor.address);
+        println!("Connecting to worker {}", url);
+        let connection = connect_async(url).await.unwrap().0;
+
+        Self { connection }
+    }
+
+    async fn get_image(&mut self, render_task: RenderTask, frame: Arc<Frame>) {
+        let render_task = serde_json::to_string(&render_task).unwrap();
+        self.connection
+            .send(Message::text(render_task))
+            .await
+            .unwrap();
+
+        let image = self.connection.next().await.unwrap().unwrap();
+        let Message::Binary(image) = image else {
+            panic!("Wrong message format");
+        };
+
+        let image = RenderedImage::from_bytes(image.to_vec()).image;
+
         frame.add_render(image).await;
     }
-}
-
-async fn connect(address: SocketAddr) -> WsStream {
-    let url = format!("ws://{}", address);
-    println!("Connecting to worker {}", url);
-    connect_async(url).await.unwrap().0
-}
-
-async fn get_image(connection: &mut WsStream, render_task: RenderTask) -> Rgb32FImage {
-    let render_task = serde_json::to_string(&render_task).unwrap();
-    connection.send(Message::text(render_task)).await.unwrap();
-
-    let image = connection.next().await.unwrap().unwrap();
-    let Message::Binary(image) = image else {
-        panic!("Wrong message format");
-    };
-
-    RenderedImage::from_bytes(image.to_vec()).image
 }

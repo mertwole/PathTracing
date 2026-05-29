@@ -51,19 +51,21 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, worker: Arc<
 
     let (mut outgoing, mut incoming) = ws_stream.split();
 
-    let message = incoming.next().await.unwrap().unwrap();
+    loop {
+        let message = incoming.next().await.unwrap().unwrap();
 
-    let Message::Text(message) = message else {
-        return;
-    };
-    let render_task: RenderTask = serde_json::from_str(&message).unwrap();
+        let Message::Text(message) = message else {
+            return;
+        };
+        let render_task: RenderTask = serde_json::from_str(&message).unwrap();
 
-    let image = worker.lock().await.render(render_task).await;
+        let image = worker.lock().await.render(render_task).await;
 
-    let image_data = RenderedImage { image }.to_bytes();
-    let message = Message::binary(image_data);
+        let image_data = RenderedImage { image }.to_bytes();
+        let message = Message::binary(image_data);
 
-    outgoing.send(message).await.unwrap();
+        outgoing.send(message).await.unwrap();
+    }
 }
 
 async fn listen_discovery_broadcasts() {
