@@ -97,7 +97,7 @@ impl CPURenderer {
         }
     }
 
-    fn divide_to_workgroups(&self, render_task: &RenderTask) -> (UVec2, Vec<WorkGroup>) {
+    fn divide_to_workgroups(&self) -> (UVec2, Vec<WorkGroup>) {
         let mut workgroups = Vec::new();
 
         // Number of full-widthed and full-heighted workgroups
@@ -140,7 +140,7 @@ impl CPURenderer {
         (workgroup_count, workgroups)
     }
 
-    pub fn get_image(&self, render_task: &RenderTask) -> Rgb32FImage {
+    pub fn get_image(&self) -> Rgb32FImage {
         let mut buffer: Vec<f32> =
             vec![0.0; self.scene.camera.resolution.x * self.scene.camera.resolution.y * 3];
 
@@ -188,8 +188,8 @@ impl Renderer for CPURenderer {
     }
 
     async fn render(&mut self, render_task: Arc<RenderTask>) -> Rgb32FImage {
-        (self.workgroup_count, self.workgroups) = self.divide_to_workgroups(&render_task);
+        (self.workgroup_count, self.workgroups) = self.divide_to_workgroups();
         self.iterations(render_task.clone());
-        self.get_image(&render_task)
+        self.get_image()
     }
 }

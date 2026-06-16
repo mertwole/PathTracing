@@ -1,12 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::camera::Camera;
-
 #[derive(Deserialize, Serialize, Clone)]
 pub struct RenderTaskUninit {
     pub scene: String,
     pub config: Config,
-    pub camera: Camera,
 }
 
 impl RenderTaskUninit {
