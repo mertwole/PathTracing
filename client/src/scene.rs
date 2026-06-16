@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
 use futures::{AsyncWriteExt, stream::StreamExt};
+use math::UVec2;
 use mongodb::{
     bson::doc,
     options::{GridFsBucketOptions, GridFsUploadOptions},
 };
-use worker::api::scene::{Image, Material, Mesh, Resource, ResourceType, SceneHierarchy};
+use worker::api::scene::{Image, Material, Mesh, Resource, ResourceType, SceneUninit};
 
 struct FileReference {
     path: String,
@@ -14,16 +15,18 @@ struct FileReference {
 pub struct Scene {
     file_references: Vec<FileReference>,
     pub md5: String,
+    pub camera_resolution: UVec2,
 }
 
 impl Scene {
     pub fn load(path: &str) -> Scene {
         let absolute_path = format!("./scene_data/{}", path);
-        let scene_data = &std::fs::read(absolute_path).unwrap();
-        let scene_md5 = format!("{:x}", md5::compute(scene_data));
-        let scene_data = SceneHierarchy::load(scene_data);
+        let scene_data = std::fs::read(absolute_path).unwrap();
+        let scene_md5 = format!("{:x}", md5::compute(&scene_data));
+        let scene_data: SceneUninit =
+            serde_json::from_str(&String::from_utf8(scene_data).unwrap()).unwrap();
 
-        let mut staged_to_load = scene_data.collect_references();
+        let mut staged_to_load = scene_data.root.collect_references();
         let mut loaded = HashSet::from([path.to_string()]);
 
         let mut md5s = HashMap::from([(path.to_string(), scene_md5)]);
@@ -81,6 +84,7 @@ impl Scene {
         Scene {
             file_references,
             md5: resulting_md5,
+            camera_resolution: scene_data.camera.resolution,
         }
     }
 

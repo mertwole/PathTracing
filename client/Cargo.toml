@@ -6,6 +6,7 @@ authors.workspace = true
 
 [dependencies]
 worker.workspace = true
+math.workspace = true
 
 anyhow.workspace = true
 futures-util = { workspace = true, features = ["sink", "std"] }

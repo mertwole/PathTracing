@@ -13,7 +13,9 @@ pub trait Resource {
     fn load(data: &[u8]) -> Self
     where
         Self: Sized;
+
     fn collect_references(&self) -> HashSet<ResourceReferenceUninit>;
+
     fn init(self, reference_replacer: &mut dyn ReferenceReplacer) -> Self::Initialized;
 }
 

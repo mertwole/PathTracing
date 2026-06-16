@@ -101,8 +101,8 @@ impl CPURenderer {
         let mut workgroups = Vec::new();
 
         // Number of full-widthed and full-heighted workgroups
-        let mut workgroup_count = render_task.camera.resolution / self.workgroup_size;
-        let remainder = render_task.camera.resolution - workgroup_count * self.workgroup_size;
+        let mut workgroup_count = self.scene.camera.resolution / self.workgroup_size;
+        let remainder = self.scene.camera.resolution - workgroup_count * self.workgroup_size;
         if remainder.x != 0 {
             workgroup_count.x += 1;
         }
@@ -142,7 +142,7 @@ impl CPURenderer {
 
     pub fn get_image(&self, render_task: &RenderTask) -> Rgb32FImage {
         let mut buffer: Vec<f32> =
-            vec![0.0; render_task.camera.resolution.x * render_task.camera.resolution.y * 3];
+            vec![0.0; self.scene.camera.resolution.x * self.scene.camera.resolution.y * 3];
 
         for x in 0..self.workgroup_count.x {
             for y in 0..self.workgroup_count.y {
@@ -155,8 +155,8 @@ impl CPURenderer {
                     for buf_y in 0..workgroup_buffer[0].len() {
                         let buf_pixel = workgroup_buffer[buf_x][buf_y];
                         let glob_y = y * self.workgroup_size.y + buf_y;
-                        let glob_y = render_task.camera.resolution.y - 1 - glob_y;
-                        let glob_adress = glob_x + glob_y * render_task.camera.resolution.x;
+                        let glob_y = self.scene.camera.resolution.y - 1 - glob_y;
+                        let glob_adress = glob_x + glob_y * self.scene.camera.resolution.x;
 
                         buffer[glob_adress * 3] = buf_pixel.r;
                         buffer[glob_adress * 3 + 1] = buf_pixel.g;
@@ -167,8 +167,8 @@ impl CPURenderer {
         }
 
         Rgb32FImage::from_raw(
-            render_task.camera.resolution.x as u32,
-            render_task.camera.resolution.y as u32,
+            self.scene.camera.resolution.x as u32,
+            self.scene.camera.resolution.y as u32,
             buffer,
         )
         .unwrap()

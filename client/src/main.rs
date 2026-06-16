@@ -34,8 +34,8 @@ async fn main() {
     scene.upload_to_mongodb(&args.mongodb_url).await;
 
     let frame = Frame::new(
-        render_task.camera.resolution.x as u32,
-        render_task.camera.resolution.y as u32,
+        scene.camera_resolution.x as u32,
+        scene.camera_resolution.y as u32,
     )
     .await;
     let frame = Arc::from(frame);
