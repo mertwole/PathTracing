@@ -20,6 +20,7 @@ impl RenderTaskUninit {
 pub struct RenderTask {
     pub scene: String,
     pub scene_md5: String,
+    // TODO: Flatten.
     pub config: Config,
 }
 
