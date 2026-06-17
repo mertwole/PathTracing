@@ -2,11 +2,11 @@ pub mod render_task;
 
 pub mod scene {
     pub use crate::scene::{
+        SceneRootUninit, SceneUninit,
         resource::{
-            image::Image, material::BoxedMaterial as Material, mesh::MeshUninit as Mesh, Resource,
-            ResourceReferenceUninit as ResourceReference, ResourceType,
+            Resource, ResourceReferenceUninit as ResourceReference, ResourceType, image::Image,
+            material::BoxedMaterial as Material, mesh::MeshUninit as Mesh,
         },
-        SceneHierarchyUninit as SceneHierarchy,
     };
 }
 

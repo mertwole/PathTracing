@@ -53,7 +53,7 @@ impl WorkGroup {
     pub fn iteration(&mut self, scene_data: Arc<Scene>, render_task: Arc<RenderTask>) {
         for x in 0..self.buffer.width {
             for y in 0..self.buffer.height {
-                let ray = render_task
+                let ray = scene_data
                     .camera
                     .get_ray(UVec2::new(self.x_offset + x, self.y_offset + y));
                 let color = self.get_color(scene_data.clone(), ray, render_task.config.trace_depth);

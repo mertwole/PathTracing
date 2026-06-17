@@ -1,12 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::camera::Camera;
-
 #[derive(Deserialize, Serialize, Clone)]
 pub struct RenderTaskUninit {
     pub scene: String,
     pub config: Config,
-    pub camera: Camera,
 }
 
 impl RenderTaskUninit {
@@ -15,7 +12,6 @@ impl RenderTaskUninit {
             scene: self.scene,
             scene_md5,
             config: self.config,
-            camera: self.camera,
         }
     }
 }
@@ -24,8 +20,8 @@ impl RenderTaskUninit {
 pub struct RenderTask {
     pub scene: String,
     pub scene_md5: String,
+    // TODO: Flatten.
     pub config: Config,
-    pub camera: Camera,
 }
 
 impl RenderTask {
@@ -34,10 +30,8 @@ impl RenderTask {
         // RenderTasks are equal even if there's different iteration count in them
         config.iterations = 0;
 
-        let ser = self.scene.clone()
-            + &self.scene_md5
-            + &serde_json::ser::to_string(&config).unwrap()
-            + &serde_json::ser::to_string(&self.camera).unwrap();
+        let ser =
+            self.scene.clone() + &self.scene_md5 + &serde_json::ser::to_string(&config).unwrap();
         format!("{:x}", md5::compute(ser))
     }
 }
