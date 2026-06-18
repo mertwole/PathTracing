@@ -7,7 +7,7 @@ use futures::{
 };
 use tokio::{
     net::{TcpListener, TcpStream, UdpSocket},
-    sync::{Mutex, broadcast, mpsc},
+    sync::{Mutex, mpsc},
 };
 use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Message};
 
@@ -19,6 +19,10 @@ use worker::{
 const WEBSOCKET_PORT: u16 = 30000;
 const BROADCAST_PORT: u16 = 40000;
 
+const RENDER_TASKS_CHANNEL_BUFFER: usize = 8;
+const IMAGES_CHANNEL_BUFFER: usize = 8;
+const FILE_REQUESTS_CHANNEL_BUFFER: usize = 8;
+
 type WsStream = WebSocketStream<TcpStream>;
 
 #[derive(Parser)]
@@ -28,11 +32,6 @@ pub struct Cli {}
 async fn main() {
     let _args = Cli::parse();
 
-    let worker = Arc::from(Mutex::new(Worker::new()));
-    start_ws(worker).await;
-}
-
-async fn start_ws(worker: Arc<Mutex<Worker>>) {
     let addr = format!("0.0.0.0:{}", WEBSOCKET_PORT);
 
     let try_socket = TcpListener::bind(&addr).await;
@@ -42,7 +41,7 @@ async fn start_ws(worker: Arc<Mutex<Worker>>) {
     tokio::spawn(listen_discovery_broadcasts());
 
     while let Ok((stream, addr)) = listener.accept().await {
-        tokio::spawn(handle_connection(stream, addr, worker.clone()));
+        tokio::spawn(handle_connection(stream, addr));
     }
 }
 
@@ -66,7 +65,7 @@ async fn listen_discovery_broadcasts() {
     }
 }
 
-async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, worker: Arc<Mutex<Worker>>) {
+async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
     println!("Incoming TCP connection from: {}", addr);
 
     let ws_stream = tokio_tungstenite::accept_async(raw_stream)
@@ -74,112 +73,161 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr, worker: Arc<
         .expect("Error during the websocket handshake occurred");
     println!("WebSocket connection established: {}", addr);
 
-    let (mut outgoing, mut incoming) = ws_stream.split();
+    let channel = WebSocketChannel::new(ws_stream);
+    channel.run().await;
+}
 
-    let (render_tasks_sender, render_tasks_receiver) = mpsc::channel(10);
-    let (renders_sender, _) = broadcast::channel(10);
+struct WebSocketChannel {
+    sender: MessageSender,
+    receiver: MessageReceiver,
+    work_processor: WorkProcessor,
+}
 
-    let file_fetcher = Arc::new(WebSocketFileFetcher::new());
-    let file_fetcher_clone = file_fetcher.clone();
+impl WebSocketChannel {
+    fn new(connection: WsStream) -> Self {
+        let (sink, stream) = connection.split();
 
-    let renders_sender_clone = renders_sender.clone();
+        let (render_tasks_sender, render_tasks_receiver) =
+            mpsc::channel(RENDER_TASKS_CHANNEL_BUFFER);
+        let (images_sender, images_receiver) = mpsc::channel(IMAGES_CHANNEL_BUFFER);
+        let (file_requests_sender, file_requests_receiver) =
+            mpsc::channel(FILE_REQUESTS_CHANNEL_BUFFER);
 
-    tokio::spawn(async move {
-        process_render_tasks(
-            render_tasks_receiver,
-            renders_sender_clone,
-            file_fetcher_clone,
-        )
-    });
+        let files_fetcher = WsFileFetcher::new(file_requests_sender);
 
-    loop {
-        if let Err(err) = connection_loop(
-            &mut outgoing,
-            &mut incoming,
-            render_tasks_sender.clone(),
-            renders_sender.clone().subscribe(),
-            file_fetcher.clone(),
-        )
-        .await
-        {
-            println!("Error during message exchange: {}", err);
-            break;
+        Self {
+            sender: MessageSender {
+                sink,
+                file_requests: file_requests_receiver,
+                images: images_receiver,
+            },
+            receiver: MessageReceiver {
+                stream,
+                files_fetcher: files_fetcher.clone(),
+                render_tasks: render_tasks_sender,
+            },
+            work_processor: WorkProcessor {
+                files_fetcher,
+                render_tasks: render_tasks_receiver,
+                images: images_sender,
+            },
+        }
+    }
+
+    async fn run(self) {
+        let Self {
+            sender,
+            receiver,
+            work_processor,
+        } = self;
+
+        tokio::spawn(work_processor.run());
+        tokio::spawn(sender.start_sending());
+        tokio::spawn(receiver.start_receiving());
+    }
+}
+
+struct MessageSender {
+    sink: SplitSink<WsStream, Message>,
+
+    file_requests: mpsc::Receiver<String>,
+    images: mpsc::Receiver<RenderedImage>,
+}
+
+impl MessageSender {
+    async fn start_sending(mut self) {
+        loop {
+            let message = tokio::select! {
+                file_request = self.file_requests.recv() => {
+                    WebSocketMessageOut::FileRequest { path: file_request.unwrap() }
+                },
+                image = self.images.recv() => {
+                    WebSocketMessageOut::Render(Box::new(image.unwrap()))
+                }
+            };
+
+            self.sink.send(message.serialize()).await.unwrap();
         }
     }
 }
 
-async fn connection_loop(
-    outgoing: &mut SplitSink<WsStream, Message>,
-    incoming: &mut SplitStream<WsStream>,
-    tasks: mpsc::Sender<RenderTask>,
-    mut renders: broadcast::Receiver<RenderedImage>,
-    file_fetcher: Arc<WebSocketFileFetcher>,
-) -> anyhow::Result<()> {
-    tokio::select! {
-        message = incoming.next() => {
-            // TODO: Process case when connection was gracefully closed.
-            let message = WebSocketMessageIn::deserialize(message.unwrap().unwrap());
+struct MessageReceiver {
+    stream: SplitStream<WsStream>,
+    files_fetcher: WsFileFetcher,
+
+    render_tasks: mpsc::Sender<RenderTask>,
+}
+
+impl MessageReceiver {
+    async fn start_receiving(mut self) {
+        loop {
+            let message = self.stream.next().await.unwrap().unwrap();
+            let message = WebSocketMessageIn::deserialize(message);
+
             match message {
                 WebSocketMessageIn::File { content, path } => {
-                    file_fetcher.on_file_received(path, content).await;
+                    self.files_fetcher.provide_file(path, content).await;
                 }
                 WebSocketMessageIn::RenderTask(task) => {
-                    tasks.send(*task).await.unwrap();
+                    self.render_tasks.send(*task).await.unwrap();
                 }
             }
-        },
-        render = renders.recv() => {
-            let message = WebSocketMessageOut::Render(Box::from(render.unwrap()));
-            outgoing.send(message.serialize()).await.unwrap();
         }
-    };
-
-    Ok(())
+    }
 }
 
-pub struct WebSocketFileFetcher {
-    received_files: Mutex<HashMap<String, Vec<u8>>>,
+struct WorkProcessor {
+    files_fetcher: WsFileFetcher,
+
+    render_tasks: mpsc::Receiver<RenderTask>,
+    images: mpsc::Sender<RenderedImage>,
 }
 
-impl WebSocketFileFetcher {
-    fn new() -> Self {
+impl WorkProcessor {
+    async fn run(mut self) {
+        let mut worker = Worker::new();
+
+        loop {
+            let task = self.render_tasks.recv().await.unwrap();
+            let image = worker.render(task, &self.files_fetcher).await;
+            self.images.send(RenderedImage { image }).await.unwrap();
+        }
+    }
+}
+
+#[derive(Clone)]
+struct WsFileFetcher {
+    received_files: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+
+    file_requests: mpsc::Sender<String>,
+}
+
+impl FileFetcher for WsFileFetcher {
+    async fn fetch(&self, path: &str) -> Vec<u8> {
+        self.file_requests.send(path.to_string()).await.unwrap();
+
+        loop {
+            let mut files = self.received_files.lock().await;
+            if let Some(content) = files.remove(path) {
+                return content;
+            };
+
+            // TODO: Find a smarter way of doing this.
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+}
+
+impl WsFileFetcher {
+    fn new(file_requests: mpsc::Sender<String>) -> Self {
         Self {
             received_files: Default::default(),
+            file_requests,
         }
     }
 
-    async fn on_file_received(&self, path: String, file: Vec<u8>) {
-        self.received_files.lock().await.insert(path, file);
-    }
-}
-
-impl FileFetcher for WebSocketFileFetcher {
-    // TODO: Find a smarter way of implementing this.
-    async fn fetch(&self, path: &str) -> Vec<u8> {
-        // TODO: Send request for file to WS.
-        loop {
-            let mut received_files = self.received_files.lock().await;
-            if !received_files.contains_key(path) {
-                tokio::time::sleep(Duration::from_millis(10)).await;
-                continue;
-            }
-
-            let file = received_files.remove(path).unwrap();
-            return file;
-        }
-    }
-}
-
-async fn process_render_tasks(
-    mut tasks: mpsc::Receiver<RenderTask>,
-    renders: broadcast::Sender<RenderedImage>,
-    file_fetcher: Arc<WebSocketFileFetcher>,
-) {
-    let mut worker = Worker::new();
-
-    loop {
-        let task = tasks.recv().await.unwrap();
-        let image = worker.render(task, file_fetcher.as_ref()).await;
-        renders.send(RenderedImage { image }).ok().unwrap();
+    async fn provide_file(&self, path: String, content: Vec<u8>) {
+        let mut files = self.received_files.lock().await;
+        files.insert(path, content);
     }
 }
