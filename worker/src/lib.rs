@@ -1,6 +1,6 @@
-use std::{collections::HashMap, iter, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-use image::{EncodableLayout, Rgb32FImage};
+use image::Rgb32FImage;
 use renderer::{Renderer, cpu_renderer::CPURenderer};
 use scene::Scene;
 
@@ -13,7 +13,7 @@ mod renderer;
 mod scene;
 
 use api::render_task::RenderTask;
-use serde::{Deserialize, Serialize, ser::SerializeSeq};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 
 use crate::file_fetcher::FileFetcher;
@@ -92,48 +92,44 @@ impl WebSocketMessageOut {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct RenderedImage {
+    #[serde(serialize_with = "serialize_image")]
+    #[serde(deserialize_with = "deserialize_image")]
     pub image: Rgb32FImage,
 }
 
-impl Serialize for RenderedImage {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let image_bytes = self.image.as_bytes();
-        let mut seq = serializer.serialize_seq(Some(2 + image_bytes.len()))?;
+fn serialize_image<S: Serializer>(image: &Rgb32FImage, serializer: S) -> Result<S::Ok, S::Error> {
+    let data = image
+        .to_vec()
+        .into_iter()
+        .flat_map(f32::to_be_bytes)
+        .collect();
 
-        seq.serialize_element(&self.image.width())?;
-        seq.serialize_element(&self.image.height())?;
-        seq.serialize_element(image_bytes)?;
-
-        seq.end()
+    ImageSerde {
+        width: image.width(),
+        height: image.height(),
+        data,
     }
+    .serialize(serializer)
 }
 
-impl<'de> Deserialize<'de> for RenderedImage {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        // let width = u32::from_le_bytes(bytes[..4].try_into().unwrap());
-        // let height = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
+fn deserialize_image<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Rgb32FImage, D::Error> {
+    let image = ImageSerde::deserialize(deserializer)?;
+    let data = image
+        .data
+        .chunks_exact(4)
+        .map(|value| f32::from_le_bytes(value.try_into().unwrap()))
+        .collect();
 
-        // bytes.drain(..8);
+    Ok(Rgb32FImage::from_vec(image.width, image.height, data).unwrap())
+}
 
-        // let data = bytes
-        //     .chunks_exact(4)
-        //     .map(|value| f32::from_le_bytes(value.try_into().unwrap()))
-        //     .collect();
-
-        // let image = Rgb32FImage::from_vec(width, height, data).unwrap();
-
-        // Self { image }
-
-        todo!()
-    }
+#[derive(Serialize, Deserialize)]
+struct ImageSerde {
+    width: u32,
+    height: u32,
+    data: Vec<u8>,
 }
 
 pub mod discovery {

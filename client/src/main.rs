@@ -13,10 +13,7 @@ use frame::Frame;
 use scene::Scene;
 
 #[derive(Parser)]
-pub struct Cli {
-    #[clap(long)]
-    mongodb_url: String,
-}
+pub struct Cli {}
 
 #[tokio::main]
 async fn main() {
@@ -30,8 +27,6 @@ async fn main() {
     let scene = Scene::load(&render_task.scene);
 
     let render_task = render_task.init(scene.md5.clone());
-
-    scene.upload_to_mongodb(&args.mongodb_url).await;
 
     let frame = Frame::new(
         scene.camera_resolution.x as u32,

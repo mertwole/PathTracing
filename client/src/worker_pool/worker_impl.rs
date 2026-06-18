@@ -102,7 +102,10 @@ impl InboundChannel {
 
             match message {
                 WebSocketMessageOut::FileRequest { path } => {
-                    let file = vec![]; // TODO: Load file.
+                    let file_path = format!("./scene_data/{}", &path);
+                    // TODO: SANITIZE!
+                    let file = std::fs::read(file_path).unwrap();
+
                     self.files.send((path, file)).await.unwrap();
                 }
                 WebSocketMessageOut::Render(render) => {
