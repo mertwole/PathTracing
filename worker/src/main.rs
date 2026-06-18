@@ -8,11 +8,14 @@ use futures::{
 };
 use tokio::{
     net::{TcpListener, TcpStream, UdpSocket},
-    sync::Mutex,
+    sync::{Mutex, mpsc},
 };
 use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Message};
 
-use worker::{RenderedImage, Worker, api::render_task::RenderTask};
+use worker::{
+    RenderedImage, WebSocketMessageIn, WebSocketMessageOut, Worker, api::render_task::RenderTask,
+    file_fetcher::FileFetcher,
+};
 
 const WEBSOCKET_PORT: u16 = 30000;
 const BROADCAST_PORT: u16 = 40000;
@@ -20,16 +23,13 @@ const BROADCAST_PORT: u16 = 40000;
 type WsStream = WebSocketStream<TcpStream>;
 
 #[derive(Parser)]
-pub struct Cli {
-    #[clap(long)]
-    mongodb_url: String,
-}
+pub struct Cli {}
 
 #[tokio::main]
 async fn main() {
-    let args = Cli::parse();
+    let _args = Cli::parse();
 
-    let worker = Arc::from(Mutex::new(Worker::new(args.mongodb_url)));
+    let worker = Arc::from(Mutex::new(Worker::new()));
     start_ws(worker).await;
 }
 
@@ -44,6 +44,26 @@ async fn start_ws(worker: Arc<Mutex<Worker>>) {
 
     while let Ok((stream, addr)) = listener.accept().await {
         tokio::spawn(handle_connection(stream, addr, worker.clone()));
+    }
+}
+
+async fn listen_discovery_broadcasts() {
+    let socket = UdpSocket::bind(&format!("0.0.0.0:{}", BROADCAST_PORT))
+        .await
+        .unwrap();
+    socket.set_broadcast(true).unwrap();
+
+    loop {
+        // TODO: Determine len.
+        let mut buffer = vec![0; 1024];
+        let (len, sender) = socket.recv_from(&mut buffer[..]).await.unwrap();
+        let _request: worker::discovery::Request = postcard::from_bytes(&buffer[..len]).unwrap();
+
+        let response = worker::discovery::Response {
+            websocket_port: WEBSOCKET_PORT,
+        };
+        let response = postcard::to_allocvec(&response).unwrap();
+        socket.send_to(&response, sender).await.unwrap();
     }
 }
 
@@ -73,41 +93,50 @@ async fn connection_loop(
     // TODO: Process case when connection was gracefully closed.
     let message = incoming.next().await.unwrap()?;
 
-    let Message::Text(message) = message else {
-        anyhow::bail!("Unexpected message format");
-    };
-    let render_task: RenderTask = serde_json::from_str(&message)
-        .map_err(|err| anyhow::anyhow!("Failed to decode render task: {}", err))?;
+    let message = WebSocketMessageIn::deserialize(message);
 
-    let image = worker.lock().await.render(render_task).await;
+    match message {
+        WebSocketMessageIn::File { content, path } => {
+            //
+        }
+        WebSocketMessageIn::RenderTask(task) => {
+            let image = worker.lock().await.render(task).await;
 
-    let image_data = RenderedImage { image }.to_bytes();
-    let message = Message::binary(image_data);
+            let response = WebSocketMessageOut::Render(Box::from(RenderedImage { image }));
 
-    outgoing
-        .send(message)
-        .await
-        .context("Failed to send render result")?;
+            outgoing
+                .send(response.serialize())
+                .await
+                .context("Failed to send render result")?;
+        }
+    }
 
     Ok(())
 }
 
-async fn listen_discovery_broadcasts() {
-    let socket = UdpSocket::bind(&format!("0.0.0.0:{}", BROADCAST_PORT))
-        .await
-        .unwrap();
-    socket.set_broadcast(true).unwrap();
+pub struct WebSocketFileFetcher {}
 
+impl WebSocketFileFetcher {
+    fn new(file_requests: mpsc::Receiver<String>, files: mpsc::Sender<Vec<u8>>) -> Self {
+        Self {}
+    }
+
+    fn on_file_received(&self, path: String, file: Vec<u8>) {
+        //
+    }
+}
+
+impl FileFetcher for WebSocketFileFetcher {
+    async fn fetch(&self, path: &str) -> Vec<u8> {
+        todo!()
+    }
+}
+
+async fn process_render_tasks(
+    tasks: mpsc::Receiver<RenderTask>,
+    renders: mpsc::Sender<RenderedImage>,
+) {
     loop {
-        // TODO: Determine len.
-        let mut buffer = vec![0; 1024];
-        let (len, sender) = socket.recv_from(&mut buffer[..]).await.unwrap();
-        let _request: worker::discovery::Request = postcard::from_bytes(&buffer[..len]).unwrap();
-
-        let response = worker::discovery::Response {
-            websocket_port: WEBSOCKET_PORT,
-        };
-        let response = postcard::to_allocvec(&response).unwrap();
-        socket.send_to(&response, sender).await.unwrap();
+        //
     }
 }

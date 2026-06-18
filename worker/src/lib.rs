@@ -1,38 +1,42 @@
 use std::{collections::HashMap, iter, sync::Arc};
 
-use file_store::FileStore;
-use image::Rgb32FImage;
+use image::{EncodableLayout, Rgb32FImage};
 use renderer::{Renderer, cpu_renderer::CPURenderer};
 use scene::Scene;
 
 pub mod api;
 mod camera;
-mod file_store;
+pub mod file_fetcher;
 mod ray;
 mod render_store;
 mod renderer;
 mod scene;
 
 use api::render_task::RenderTask;
+use serde::{Deserialize, Serialize, ser::SerializeSeq};
+use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
+
+use crate::file_fetcher::FileFetcher;
 
 pub struct Worker {
-    mongodb_url: String,
     cached_scenes: HashMap<String, Arc<Scene>>,
 }
 
 impl Worker {
-    pub fn new(mongodb_url: String) -> Self {
+    pub fn new() -> Self {
         Self {
-            mongodb_url,
             cached_scenes: Default::default(),
         }
     }
 
-    pub async fn render(&mut self, render_task: RenderTask) -> Rgb32FImage {
+    pub async fn render(
+        &mut self,
+        render_task: RenderTask,
+        file_fetcher: &impl FileFetcher,
+    ) -> Rgb32FImage {
         if !self.cached_scenes.contains_key(&render_task.scene_md5) {
             println!("Loading scene files...");
-            let file_store = FileStore::connect(&self.mongodb_url, &render_task.scene_md5).await;
-            let scene = Scene::load(&file_store, &render_task.scene).await;
+            let scene = Scene::load(file_fetcher, &render_task.scene).await;
             self.cached_scenes
                 .insert(render_task.scene_md5.clone(), Arc::from(scene));
             println!("Scene files loaded");
@@ -48,33 +52,86 @@ impl Worker {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub enum WebSocketMessageIn {
+    RenderTask(Box<RenderTask>),
+    File { content: Vec<u8>, path: String },
+}
+
+impl WebSocketMessageIn {
+    pub fn serialize(self) -> WsMessage {
+        WsMessage::binary(postcard::to_stdvec(&self).unwrap())
+    }
+
+    pub fn deserialize(message: WsMessage) -> Self {
+        let WsMessage::Binary(message) = message else {
+            panic!("Unexpected message format");
+        };
+
+        postcard::from_bytes(&message.to_vec()).unwrap()
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum WebSocketMessageOut {
+    Render(Box<RenderedImage>),
+    FileRequest { path: String },
+}
+
+impl WebSocketMessageOut {
+    pub fn serialize(self) -> WsMessage {
+        WsMessage::binary(postcard::to_stdvec(&self).unwrap())
+    }
+
+    pub fn deserialize(message: WsMessage) -> Self {
+        let WsMessage::Binary(message) = message else {
+            panic!("Unexpected message format");
+        };
+
+        postcard::from_bytes(&message.to_vec()).unwrap()
+    }
+}
+
 pub struct RenderedImage {
     pub image: Rgb32FImage,
 }
 
-impl RenderedImage {
-    pub fn to_bytes(self) -> Vec<u8> {
-        iter::once(self.image.width().to_le_bytes())
-            .chain(iter::once(self.image.height().to_le_bytes()))
-            .chain(self.image.iter().map(|value| value.to_le_bytes()))
-            .flatten()
-            .collect()
+impl Serialize for RenderedImage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let image_bytes = self.image.as_bytes();
+        let mut seq = serializer.serialize_seq(Some(2 + image_bytes.len()))?;
+
+        seq.serialize_element(&self.image.width())?;
+        seq.serialize_element(&self.image.height())?;
+        seq.serialize_element(image_bytes)?;
+
+        seq.end()
     }
+}
 
-    pub fn from_bytes(mut bytes: Vec<u8>) -> Self {
-        let width = u32::from_le_bytes(bytes[..4].try_into().unwrap());
-        let height = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
+impl<'de> Deserialize<'de> for RenderedImage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // let width = u32::from_le_bytes(bytes[..4].try_into().unwrap());
+        // let height = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
 
-        bytes.drain(..8);
+        // bytes.drain(..8);
 
-        let data = bytes
-            .chunks_exact(4)
-            .map(|value| f32::from_le_bytes(value.try_into().unwrap()))
-            .collect();
+        // let data = bytes
+        //     .chunks_exact(4)
+        //     .map(|value| f32::from_le_bytes(value.try_into().unwrap()))
+        //     .collect();
 
-        let image = Rgb32FImage::from_vec(width, height, data).unwrap();
+        // let image = Rgb32FImage::from_vec(width, height, data).unwrap();
 
-        Self { image }
+        // Self { image }
+
+        todo!()
     }
 }
 
