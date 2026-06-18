@@ -119,7 +119,7 @@ fn deserialize_image<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Rgb32
     let data = image
         .data
         .chunks_exact(4)
-        .map(|value| f32::from_le_bytes(value.try_into().unwrap()))
+        .map(|value| f32::from_be_bytes(value.try_into().unwrap()))
         .collect();
 
     Ok(Rgb32FImage::from_vec(image.width, image.height, data).unwrap())
