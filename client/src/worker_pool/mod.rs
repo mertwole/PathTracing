@@ -6,22 +6,23 @@ use std::{
     time::Duration,
 };
 
-use anyhow::Context;
-use futures::{SinkExt, StreamExt};
 use tokio::{
     net::{TcpStream, UdpSocket},
     sync::{RwLock, mpsc, watch},
     time::timeout,
 };
 use tokio_stream::wrappers::WatchStream;
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use worker::{
-    RenderedImage,
     api::render_task::RenderTask,
     discovery::{Request as DiscoveryRequest, Response as DiscoveryResponse},
 };
 
 use crate::frame::Frame;
+
+mod worker_impl;
+
+use worker_impl::{Worker, WorkerDescriptor};
 
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(5);
 const DISCOVERY_PORT: u16 = 40000;
@@ -210,7 +211,7 @@ impl Scheduler {
         tokio::spawn(async move {
             loop {
                 let worker_descriptor = discovered_workers.recv().await.unwrap();
-                let worker = Worker::connect(&worker_descriptor).await;
+                let worker = Worker::connect(&worker_descriptor, self.frame.clone()).await;
                 workers_map
                     .write()
                     .await
@@ -226,7 +227,7 @@ impl Scheduler {
             // TODO: Parallelize.
             for i in (0..workers.len()).rev() {
                 let (_, worker) = &mut workers[i];
-                if let Err(err) = worker.get_image(task.clone(), self.frame.clone()).await {
+                if let Err(err) = worker.send_render_task(task.clone()).await {
                     // TODO: Notify the worker pool user about disconnected workers.
                     println!("Error during message exchange: {}", err);
                     workers.remove(i);
@@ -235,53 +236,5 @@ impl Scheduler {
 
             self.workers.write().await.extend(workers);
         }
-    }
-}
-
-#[derive(PartialEq, Eq, Hash, Clone)]
-struct WorkerDescriptor {
-    address: SocketAddr,
-}
-
-struct Worker {
-    connection: WsStream,
-}
-
-impl Worker {
-    async fn connect(descriptor: &WorkerDescriptor) -> Self {
-        let url = format!("ws://{}", descriptor.address);
-        println!("Connecting to worker {}", url);
-        let connection = connect_async(url).await.unwrap().0;
-
-        Self { connection }
-    }
-
-    async fn get_image(
-        &mut self,
-        render_task: RenderTask,
-        frame: Arc<Frame>,
-    ) -> anyhow::Result<()> {
-        let render_task =
-            serde_json::to_string(&render_task).expect("Failed to serialze render task");
-        self.connection
-            .send(Message::text(render_task))
-            .await
-            .context("Failed to send render task")?;
-
-        // TODO: Process case when connection was gracefully closed.
-        let image = self
-            .connection
-            .next()
-            .await
-            .unwrap()
-            .context("Failed to receive image")?;
-        let Message::Binary(image) = image else {
-            anyhow::bail!("Unexpected message format");
-        };
-
-        let image = RenderedImage::from_bytes(image.to_vec()).image;
-        frame.add_render(image).await;
-
-        Ok(())
     }
 }
