@@ -92,6 +92,7 @@ impl WebSocketMessageOut {
     }
 }
 
+#[derive(Clone)]
 pub struct RenderedImage {
     pub image: Rgb32FImage,
 }
