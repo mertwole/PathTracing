@@ -1,3 +1,3 @@
 pub trait FileFetcher {
-    async fn fetch(&self, path: &str) -> Vec<u8>;
+    fn fetch(&self, path: &str) -> impl Future<Output = Vec<u8>>;
 }

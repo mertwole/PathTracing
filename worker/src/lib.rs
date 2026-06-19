@@ -8,7 +8,6 @@ pub mod api;
 mod camera;
 pub mod file_fetcher;
 mod ray;
-mod render_store;
 mod renderer;
 mod scene;
 
@@ -20,6 +19,12 @@ use crate::file_fetcher::FileFetcher;
 
 pub struct Worker {
     cached_scenes: HashMap<String, Arc<Scene>>,
+}
+
+impl Default for Worker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Worker {
@@ -68,7 +73,7 @@ impl WebSocketMessageIn {
             panic!("Unexpected message format");
         };
 
-        postcard::from_bytes(&message.to_vec()).unwrap()
+        postcard::from_bytes(&message).unwrap()
     }
 }
 
@@ -88,7 +93,7 @@ impl WebSocketMessageOut {
             panic!("Unexpected message format");
         };
 
-        postcard::from_bytes(&message.to_vec()).unwrap()
+        postcard::from_bytes(&message).unwrap()
     }
 }
 
@@ -100,11 +105,7 @@ pub struct RenderedImage {
 }
 
 fn serialize_image<S: Serializer>(image: &Rgb32FImage, serializer: S) -> Result<S::Ok, S::Error> {
-    let data = image
-        .to_vec()
-        .into_iter()
-        .flat_map(f32::to_be_bytes)
-        .collect();
+    let data = image.iter().copied().flat_map(f32::to_be_bytes).collect();
 
     ImageSerde {
         width: image.width(),

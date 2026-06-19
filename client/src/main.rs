@@ -17,7 +17,7 @@ pub struct Cli {}
 
 #[tokio::main]
 async fn main() {
-    let args = Cli::parse();
+    let _args = Cli::parse();
 
     let render_task_path = "./scene_data/render_task.json";
     let render_task_data = std::fs::read(render_task_path).unwrap();

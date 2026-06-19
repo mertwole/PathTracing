@@ -9,7 +9,3 @@ pub mod scene {
         },
     };
 }
-
-pub mod render_store {
-    pub use crate::render_store::RenderStore;
-}
