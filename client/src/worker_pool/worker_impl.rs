@@ -47,6 +47,7 @@ impl Worker {
             files: files_sender,
         };
 
+        // TODO: Process errors returned here.
         tokio::spawn(outbound.run());
         tokio::spawn(inbound.run());
 
@@ -56,8 +57,7 @@ impl Worker {
     }
 
     pub async fn send_render_task(&mut self, render_task: RenderTask) -> anyhow::Result<()> {
-        self.render_tasks.send(render_task).await.unwrap();
-
+        self.render_tasks.send(render_task).await?;
         Ok(())
     }
 }
@@ -70,19 +70,19 @@ struct OutboundChannel {
 }
 
 impl OutboundChannel {
-    async fn run(mut self) {
+    async fn run(mut self) -> anyhow::Result<()> {
         loop {
             let message = tokio::select! {
                 file = self.files.recv() => {
-                    let (path, content) = file.unwrap();
+                    let (path, content) = file?;
                     WebSocketMessageIn::File { content, path }
                 },
                 render_task = self.render_tasks.recv() => {
-                    WebSocketMessageIn::RenderTask(Box::new(render_task.unwrap()))
+                    WebSocketMessageIn::RenderTask(Box::new(render_task?))
                 }
             };
 
-            self.sink.send(message.serialize()).await.unwrap();
+            self.sink.send(message.serialize()).await?;
         }
     }
 }
@@ -95,9 +95,9 @@ struct InboundChannel {
 }
 
 impl InboundChannel {
-    async fn run(mut self) {
+    async fn run(mut self) -> anyhow::Result<()> {
         loop {
-            let message = self.stream.next().await.unwrap().unwrap();
+            let message = self.stream.next().await.unwrap()?;
             let message = WebSocketMessageOut::deserialize(message);
 
             match message {
@@ -106,7 +106,7 @@ impl InboundChannel {
                     // TODO: SANITIZE!
                     let file = std::fs::read(file_path).unwrap();
 
-                    self.files.send((path, file)).await.unwrap();
+                    self.files.send((path, file)).await?;
                 }
                 WebSocketMessageOut::Render(render) => {
                     let image = render.image;
