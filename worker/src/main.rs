@@ -121,6 +121,7 @@ impl WebSocketChannel {
             work_processor,
         } = self;
 
+        // TODO: Process errors returned here.
         tokio::spawn(work_processor.run());
         tokio::spawn(sender.start_sending());
         tokio::spawn(receiver.start_receiving());
@@ -135,18 +136,20 @@ struct MessageSender {
 }
 
 impl MessageSender {
-    async fn start_sending(mut self) {
+    async fn start_sending(mut self) -> anyhow::Result<()> {
         loop {
             let message = tokio::select! {
                 file_request = self.file_requests.recv() => {
-                    WebSocketMessageOut::FileRequest { path: file_request.unwrap() }
+                    let file_request = file_request.ok_or(anyhow::anyhow!("Channel closed"))?;
+                    WebSocketMessageOut::FileRequest { path: file_request }
                 },
                 image = self.images.recv() => {
-                    WebSocketMessageOut::Render(Box::new(image.unwrap()))
+                    let image = image.ok_or(anyhow::anyhow!("Channel closed"))?;
+                    WebSocketMessageOut::Render(Box::new(image))
                 }
             };
 
-            self.sink.send(message.serialize()).await.unwrap();
+            self.sink.send(message.serialize()).await?;
         }
     }
 }
@@ -159,9 +162,9 @@ struct MessageReceiver {
 }
 
 impl MessageReceiver {
-    async fn start_receiving(mut self) {
+    async fn start_receiving(mut self) -> anyhow::Result<()> {
         loop {
-            let message = self.stream.next().await.unwrap().unwrap();
+            let message = self.stream.next().await.unwrap()?;
             let message = WebSocketMessageIn::deserialize(message);
 
             match message {
@@ -169,7 +172,7 @@ impl MessageReceiver {
                     self.files_fetcher.provide_file(path, content).await;
                 }
                 WebSocketMessageIn::RenderTask(task) => {
-                    self.render_tasks.send(*task).await.unwrap();
+                    self.render_tasks.send(*task).await?;
                 }
             }
         }
@@ -184,13 +187,17 @@ struct WorkProcessor {
 }
 
 impl WorkProcessor {
-    async fn run(mut self) {
+    async fn run(mut self) -> anyhow::Result<()> {
         let mut worker = Worker::new();
 
         loop {
-            let task = self.render_tasks.recv().await.unwrap();
+            let task = self
+                .render_tasks
+                .recv()
+                .await
+                .ok_or(anyhow::anyhow!("Channel closed"))?;
             let image = worker.render(task, &self.files_fetcher).await;
-            self.images.send(RenderedImage { image }).await.unwrap();
+            self.images.send(RenderedImage { image }).await?;
         }
     }
 }
