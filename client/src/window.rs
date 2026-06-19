@@ -12,7 +12,6 @@ use iced::{
     },
 };
 use iced_aw::{TabLabel, Tabs};
-use worker::api::render_task::{Config, RenderTaskUninit};
 
 use crate::{
     frame::Frame,

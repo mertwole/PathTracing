@@ -13,14 +13,11 @@ use frame::Frame;
 use scene::Scene;
 
 #[derive(Parser)]
-pub struct Cli {
-    #[clap(long)]
-    mongodb_url: String,
-}
+pub struct Cli {}
 
 #[tokio::main]
 async fn main() {
-    let args = Cli::parse();
+    let _args = Cli::parse();
 
     let render_task_path = "./scene_data/render_task.json";
     let render_task_data = std::fs::read(render_task_path).unwrap();
@@ -30,8 +27,6 @@ async fn main() {
     let scene = Scene::load(&render_task.scene);
 
     let render_task = render_task.init(scene.md5.clone());
-
-    scene.upload_to_mongodb(&args.mongodb_url).await;
 
     let frame = Frame::new(
         scene.camera_resolution.x as u32,

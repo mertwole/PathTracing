@@ -6,7 +6,7 @@ use std::{
 pub mod hierarchy;
 pub mod resource;
 
-use crate::{camera::Camera, file_store::FileStore};
+use crate::{camera::Camera, file_fetcher::FileFetcher};
 use resource::ReferenceMapping;
 use serde::{Deserialize, Serialize};
 
@@ -70,8 +70,8 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub async fn load(file_store: &FileStore, scene_path: &str) -> Scene {
-        let scene_data = file_store.fetch_file(scene_path).await;
+    pub async fn load(file_fetcher: &impl FileFetcher, scene_path: &str) -> Scene {
+        let scene_data = file_fetcher.fetch(scene_path).await;
         let scene_data = String::from_utf8(scene_data).unwrap();
 
         let SceneUninit { root, camera } = serde_json::from_str(&scene_data).unwrap();
@@ -98,7 +98,7 @@ impl Scene {
 
             // TODO: Generalize?
             for (resource_type, uninit_ref, init_ref) in pending_processing {
-                let file_data = file_store.fetch_file(&uninit_ref).await;
+                let file_data = file_fetcher.fetch(&uninit_ref).await;
 
                 match resource_type {
                     ResourceType::Mesh => {
