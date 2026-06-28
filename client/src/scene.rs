@@ -1,11 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use math::UVec2;
 use worker::api::scene::{Image, Material, Mesh, Resource, ResourceType, SceneUninit};
 
 pub struct Scene {
     pub md5: String,
-    pub camera_resolution: UVec2,
 }
 
 impl Scene {
@@ -66,9 +64,6 @@ impl Scene {
                 format!("{:x}", md5::compute(acc + &x))
             });
 
-        Scene {
-            md5: resulting_md5,
-            camera_resolution: scene_data.camera.resolution,
-        }
+        Scene { md5: resulting_md5 }
     }
 }

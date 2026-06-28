@@ -19,12 +19,12 @@ impl Hash for Frame {
 }
 
 impl Frame {
-    pub async fn new(width: u32, height: u32) -> Self {
-        let (result_sender, result_receiver) = channel(RgbaImage::new(width, height));
+    pub fn new() -> Self {
+        let (result_sender, result_receiver) = channel(RgbaImage::new(0, 0));
 
         Self {
             render_sum: Mutex::from(RenderSum {
-                sum: Rgb32FImage::new(width, height),
+                sum: Rgb32FImage::new(0, 0),
                 count: 0,
             }),
             result_sender,
@@ -59,6 +59,13 @@ struct RenderSum {
 
 impl RenderSum {
     fn add_render(&mut self, render: Rgb32FImage) {
+        if self.count == 0 {
+            self.sum = render;
+            self.count = 1;
+
+            return;
+        }
+
         for x in 0..render.width() {
             for y in 0..render.height() {
                 let pixel = self.sum.get_pixel_mut(x, y);
