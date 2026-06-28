@@ -19,7 +19,7 @@ impl Hash for Frame {
 }
 
 impl Frame {
-    pub async fn new() -> Self {
+    pub fn new() -> Self {
         let (result_sender, result_receiver) = channel(RgbaImage::new(0, 0));
 
         Self {

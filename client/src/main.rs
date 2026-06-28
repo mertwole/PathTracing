@@ -16,7 +16,7 @@ pub struct Cli {}
 async fn main() {
     let _args = Cli::parse();
 
-    let frame = Frame::new().await;
+    let frame = Frame::new();
     let frame = Arc::from(frame);
 
     let worker_pool = worker_pool::start(frame.clone());
