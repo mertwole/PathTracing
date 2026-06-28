@@ -5,10 +5,11 @@ use futures::StreamExt;
 use iced::{
     Alignment, Element, Subscription, Task,
     advanced::image::Handle as ImageHandle,
+    alignment::Horizontal,
     application::BootFn,
     widget::{
         self, button, center, column, container as container_widget, container::Style, image, row,
-        text, text_input,
+        space, text, text_input,
     },
 };
 use iced_aw::{TabLabel, Tabs};
@@ -144,56 +145,47 @@ impl Layout {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        Tabs::new(Message::TabSelected)
-            .push(
-                TabId::Render,
-                TabLabel::Text("render".to_string()),
-                render_tab(&self.render, &self.render_task),
-            )
-            .push(
-                TabId::Workers,
-                TabLabel::Text("workers".to_string()),
-                workers_tab(&self.worker_addresses),
-            )
-            .set_active_tab(&self.active_tab)
-            .into()
+        let render_task = render_task(&self.render_task);
+        let worker_list = worker_list(&self.worker_addresses);
+
+        let submit_render_task = button("submit").on_press(Message::SubmitRenderTask);
+        let submit_render_task =
+            row![space::horizontal(), submit_render_task, space::horizontal()].padding(8);
+
+        let left_panel = column![
+            render_task,
+            worker_list,
+            space::vertical(),
+            submit_render_task
+        ]
+        .width(256);
+
+        let render = render_area(&self.render);
+
+        row![left_panel, render].into()
     }
 }
 
-fn render_tab<'a>(
-    render: &'a Option<RgbaImage>,
-    render_task: &'a RenderTaskData,
-) -> Element<'a, Message> {
-    let render = match render {
-        Some(render) => column![image(ImageHandle::from_rgba(
-            render.width(),
-            render.height(),
-            render.to_vec(),
-        ))],
-        None => column![],
-    };
-
+fn render_task<'a>(render_task: &'a RenderTaskData) -> Element<'a, Message> {
     let scene_path = row![
         text("scene path"),
         text_input("", &render_task.scene_path).on_input(Message::ScenePathChanged)
     ];
     let iterations = row![
-        text("iterations:"),
+        text("iterations"),
         text_input("", &render_task.iteration_count).on_input(Message::IterationCountChanged)
     ];
     let trace_depth = row![
-        text("trace depth:"),
+        text("trace depth"),
         text_input("", &render_task.trace_depth).on_input(Message::TraceDepthChanged)
     ];
 
-    let submit_render_task = button("submit").on_press(Message::SubmitRenderTask);
-
-    let render_task = column![scene_path, iterations, trace_depth, submit_render_task];
-
-    row![render_task, center(render).padding(10)].into()
+    container_widget(column![scene_path, iterations, trace_depth].spacing(8))
+        .padding(8)
+        .into()
 }
 
-fn workers_tab(addresses: &[String]) -> Element<'_, Message> {
+fn worker_list(addresses: &[String]) -> Element<'_, Message> {
     let discover = button("discover workers").on_press(Message::StartWorkerDiscovery);
     let discover = container_widget(discover)
         .padding(8)
@@ -213,11 +205,25 @@ fn workers_tab(addresses: &[String]) -> Element<'_, Message> {
         })
         .collect();
 
-    let worker_list = if addresses.is_empty() {
-        center(text("No workers found"))
+    let worker_list: Element<_> = if addresses.is_empty() {
+        text("No workers found").into()
     } else {
-        center(column(entries).spacing(8))
+        column(entries).spacing(8).into()
+    };
+    let worker_list = container_widget(worker_list).padding(8);
+
+    column![discover, worker_list].into()
+}
+
+fn render_area<'a>(render: &'a Option<RgbaImage>) -> Element<'a, Message> {
+    let render = match render {
+        Some(render) => column![image(ImageHandle::from_rgba(
+            render.width(),
+            render.height(),
+            render.to_vec(),
+        ))],
+        None => column![],
     };
 
-    row![discover, worker_list].into()
+    center(render).into()
 }
