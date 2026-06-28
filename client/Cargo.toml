@@ -11,7 +11,6 @@ math.workspace = true
 anyhow.workspace = true
 futures-util = { workspace = true, features = ["sink", "std"] }
 iced = { workspace = true, features = ["canvas", "debug", "image", "advanced"] }
-iced_aw = { workspace = true, features = ["full"] }
 postcard.workspace = true
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true, features = ["sync"] }

@@ -5,17 +5,17 @@ use futures::StreamExt;
 use iced::{
     Alignment, Element, Subscription, Task,
     advanced::image::Handle as ImageHandle,
-    alignment::Horizontal,
     application::BootFn,
     widget::{
         self, button, center, column, container as container_widget, container::Style, image, row,
         space, text, text_input,
     },
 };
-use iced_aw::{TabLabel, Tabs};
+use worker::api::render_task::{Config as RenderTaskConfig, RenderTaskUninit};
 
 use crate::{
     frame::Frame,
+    scene::Scene,
     worker_pool::{self},
 };
 
@@ -24,7 +24,6 @@ pub fn start(frame: Arc<Frame>, worker_pool: worker_pool::Handle) -> iced::Resul
         Layout {
             frame,
             worker_pool,
-            active_tab: Default::default(),
             render: None,
             worker_addresses: vec![],
             render_task: RenderTaskData {
@@ -45,7 +44,6 @@ struct Layout {
     frame: Arc<Frame>,
     worker_pool: worker_pool::Handle,
 
-    active_tab: TabId,
     render: Option<RgbaImage>,
     worker_addresses: Vec<String>,
 
@@ -61,22 +59,13 @@ struct RenderTaskData {
 
 #[derive(Debug, Clone)]
 enum Message {
-    // TODO: Box RgbaImage.
     NewRender(RgbaImage),
     WorkerPoolStatsChanged(Vec<SocketAddr>),
     StartWorkerDiscovery,
-    TabSelected(TabId),
     ScenePathChanged(String),
     IterationCountChanged(String),
     TraceDepthChanged(String),
     SubmitRenderTask,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
-enum TabId {
-    #[default]
-    Render,
-    Workers,
 }
 
 impl BootFn<Layout, Message> for Layout {
@@ -85,7 +74,6 @@ impl BootFn<Layout, Message> for Layout {
             Layout {
                 frame: self.frame.clone(),
                 worker_pool: self.worker_pool.clone(),
-                active_tab: Default::default(),
                 render: None,
                 worker_addresses: vec![],
                 render_task: self.render_task.clone(),
@@ -114,9 +102,6 @@ impl Layout {
             Message::StartWorkerDiscovery => {
                 self.worker_pool.discover();
             }
-            Message::TabSelected(tab) => {
-                self.active_tab = tab;
-            }
             Message::ScenePathChanged(path) => {
                 self.render_task.scene_path = path;
             }
@@ -127,7 +112,30 @@ impl Layout {
                 self.render_task.trace_depth = depth;
             }
             Message::SubmitRenderTask => {
-                // TODO
+                let scene = Scene::load(&self.render_task.scene_path);
+
+                // TODO: User-friendly error message.
+                let trace_depth = self
+                    .render_task
+                    .trace_depth
+                    .parse()
+                    .expect("Wrong trace depth value");
+                let iterations = self
+                    .render_task
+                    .iteration_count
+                    .parse()
+                    .expect("Wrong iteration count value");
+
+                let render_task = RenderTaskUninit {
+                    scene: self.render_task.scene_path.clone(),
+                    config: RenderTaskConfig {
+                        trace_depth,
+                        iterations,
+                    },
+                };
+                let render_task = render_task.init(scene.md5);
+
+                self.worker_pool.send_render_task(render_task).unwrap();
             }
         }
     }
